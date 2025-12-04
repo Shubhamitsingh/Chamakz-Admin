@@ -17,7 +17,8 @@
     "react-router-dom": "^6.26.0",
     "framer-motion": "^11.3.28",
     "recharts": "^2.12.7",
-    "lucide-react": "^0.428.0"
+    "lucide-react": "^0.428.0",
+    "firebase": "^10.7.1"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",
