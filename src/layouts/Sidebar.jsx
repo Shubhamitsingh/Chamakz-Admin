@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -7,18 +8,23 @@ import {
   Ticket,
   MessageSquare,
   UserCheck,
-  Store,
   Calendar,
   DollarSign,
   Settings,
   LogOut,
   ChevronLeft,
   MessageCircle,
+  Coins,
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 
 const Sidebar = () => {
-  const { sidebarOpen, toggleSidebar, logout, openTicketsCount, newUsersCount } = useApp()
+  const { sidebarOpen, toggleSidebar, logout, openTicketsCount, newUsersCount, unreadChatsCount } = useApp()
+  
+  // Debug: Log unread chat count (remove in production)
+  useEffect(() => {
+    console.log('🔴 Sidebar - unreadChatsCount:', unreadChatsCount, 'type:', typeof unreadChatsCount, 'badge will show:', Number(unreadChatsCount) > 0)
+  }, [unreadChatsCount])
 
   const menuItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -26,10 +32,10 @@ const Sidebar = () => {
     { path: '/wallet', icon: Wallet, label: 'Wallet / Coins' },
     { path: '/transactions', icon: DollarSign, label: 'Payment' },
     { path: '/tickets', icon: Ticket, label: 'Tickets / Support', badge: openTicketsCount },
-    { path: '/chats', icon: MessageSquare, label: 'Chats' },
+    { path: '/chats', icon: MessageSquare, label: 'Chats', badge: unreadChatsCount },
     { path: '/feedback', icon: MessageCircle, label: 'Feedback' },
     { path: '/approvals', icon: UserCheck, label: 'Account Approvals' },
-    { path: '/resellers', icon: Store, label: 'Resellers' },
+    { path: '/coinreseller', icon: Coins, label: 'CoinReseller' },
     { path: '/events', icon: Calendar, label: 'Events' },
     { path: '/settings', icon: Settings, label: 'Settings' },
   ]
@@ -80,14 +86,14 @@ const Sidebar = () => {
               >
                 <item.icon className="w-5 h-5 flex-shrink-0" />
                 {sidebarOpen && <span className="font-medium">{item.label}</span>}
-                {item.badge > 0 && (
+                {item.badge !== undefined && Number(item.badge) > 0 && (
                   <span className="ml-auto bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center">
-                    {item.badge}
+                    {item.badge > 99 ? '99+' : item.badge}
                   </span>
                 )}
-                {!sidebarOpen && item.badge > 0 && (
+                {!sidebarOpen && item.badge !== undefined && Number(item.badge) > 0 && (
                   <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
-                    {item.badge}
+                    {item.badge > 99 ? '99+' : item.badge}
                   </span>
                 )}
               </NavLink>

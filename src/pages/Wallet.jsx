@@ -145,17 +145,16 @@ const Wallet = () => {
 
   const handleSearchUser = async () => {
     if (!userId || !userId.trim()) {
-      showToast('Please enter a Numeric User ID', 'error')
+      showToast('Please enter a Numeric User ID or Coin Reseller ID', 'error')
       return
     }
 
     setProcessing(true)
     try {
-      // Search by numericUserId field (try both string and number format)
-      const usersRef = collection(db, 'users')
       const searchValue = userId.trim()
       
-      // Try as string first
+      // First, search in users collection
+      const usersRef = collection(db, 'users')
       let q = query(usersRef, where('numericUserId', '==', searchValue))
       let querySnapshot = await getDocs(q)
       
@@ -163,6 +162,91 @@ const Wallet = () => {
       if (querySnapshot.empty && !isNaN(searchValue)) {
         q = query(usersRef, where('numericUserId', '==', Number(searchValue)))
         querySnapshot = await getDocs(q)
+      }
+
+      // If still not found, search in coinResellers collection
+      if (querySnapshot.empty) {
+        try {
+          const coinResellersRef = collection(db, 'coinResellers')
+          let resellerQ = query(coinResellersRef, where('numericUserId', '==', searchValue))
+          let resellerSnapshot = await getDocs(resellerQ)
+          
+          if (resellerSnapshot.empty && !isNaN(searchValue)) {
+            resellerQ = query(coinResellersRef, where('numericUserId', '==', Number(searchValue)))
+            resellerSnapshot = await getDocs(resellerQ)
+          }
+          
+          if (!resellerSnapshot.empty) {
+            // Coin reseller found
+            const resellerDoc = resellerSnapshot.docs[0]
+            const resellerData = resellerDoc.data()
+            const resellerCoins = resellerData.coins || 0
+            
+            // Check if wallet exists and sync if needed
+            try {
+              const walletsRef = collection(db, 'wallets')
+              // Try to find wallet by userId first
+              let walletQuery = query(walletsRef, where('userId', '==', resellerDoc.id))
+              let walletSnapshot = await getDocs(walletQuery)
+              
+              // If not found, try by numericUserId
+              if (walletSnapshot.empty && resellerData.numericUserId) {
+                walletQuery = query(walletsRef, where('numericUserId', '==', resellerData.numericUserId))
+                walletSnapshot = await getDocs(walletQuery)
+              }
+              
+              if (walletSnapshot.empty) {
+                // Create new wallet for coin reseller
+                await addDoc(walletsRef, {
+                  userId: resellerDoc.id,
+                  numericUserId: resellerData.numericUserId || searchValue,
+                  userName: resellerData.name || 'Unknown Reseller',
+                  userEmail: resellerData.email || 'No email',
+                  balance: resellerCoins,
+                  coins: resellerCoins,
+                  role: 'CoinReseller',
+                  createdAt: serverTimestamp(),
+                  updatedAt: serverTimestamp()
+                })
+                console.log('✅ Created wallet for coin reseller:', resellerData.numericUserId)
+              } else {
+                // Update existing wallet if balance doesn't match
+                const walletDoc = walletSnapshot.docs[0]
+                const walletData = walletDoc.data()
+                if (walletData.balance !== resellerCoins || walletData.coins !== resellerCoins) {
+                  await updateDoc(doc(db, 'wallets', walletDoc.id), {
+                    userId: resellerDoc.id, // Ensure userId is set
+                    numericUserId: resellerData.numericUserId || walletData.numericUserId || searchValue,
+                    balance: resellerCoins,
+                    coins: resellerCoins,
+                    role: 'CoinReseller',
+                    updatedAt: serverTimestamp()
+                  })
+                  console.log('✅ Synced wallet balance for coin reseller:', resellerData.numericUserId)
+                }
+              }
+            } catch (walletError) {
+              console.log('Wallet sync skipped:', walletError.message)
+            }
+            
+            setFoundUser({
+              id: resellerDoc.id,
+              numericUserId: resellerData.numericUserId || searchValue,
+              name: resellerData.name || 'Unknown Reseller',
+              email: resellerData.email || 'No email',
+              role: 'CoinReseller',
+              status: resellerData.status || 'Active',
+              coins: resellerCoins,
+              accountType: 'CoinReseller',
+              ...resellerData
+            })
+            showToast('Coin Reseller found successfully!', 'success')
+            setProcessing(false)
+            return
+          }
+        } catch (resellerError) {
+          console.log('Error searching coin resellers:', resellerError)
+        }
       }
 
       if (!querySnapshot.empty) {
@@ -277,16 +361,16 @@ const Wallet = () => {
             showToast('User found successfully!', 'success')
           } else {
             setFoundUser(null)
-            showToast('User not found. Please check the Numeric User ID.', 'error')
+            showToast('User or Coin Reseller not found. Please check the Numeric ID.', 'error')
           }
         } catch (fallbackError) {
           setFoundUser(null)
-          showToast('User not found. Please check the Numeric User ID.', 'error')
+          showToast('User or Coin Reseller not found. Please check the Numeric ID.', 'error')
         }
       }
     } catch (error) {
-      console.error('Error searching user:', error)
-      showToast('Error searching user. Please try again.', 'error')
+      console.error('Error searching user/reseller:', error)
+      showToast('Error searching. Please try again.', 'error')
       setFoundUser(null)
     }
     setProcessing(false)
@@ -306,41 +390,161 @@ const Wallet = () => {
 
     setProcessing(true)
     try {
-      const userRef = doc(db, 'users', foundUser.id)
+      const isCoinReseller = foundUser.role === 'CoinReseller' || foundUser.accountType === 'CoinReseller'
       
-      // Get current user data to check if coins field exists
-      const userSnap = await getDoc(userRef)
-      const currentUserData = userSnap.data()
-      const currentCoins = currentUserData?.coins || 0
+      // For coin resellers, try to find the document in coinResellers collection first
+      // If not found, try users collection (since approved resellers are in both)
+      let userRef = null
+      let currentUserData = null
+      let currentCoins = 0
+      
+      if (isCoinReseller) {
+        // Try coinResellers collection first
+        const coinResellerRef = doc(db, 'coinResellers', foundUser.id)
+        const coinResellerSnap = await getDoc(coinResellerRef)
+        
+        if (coinResellerSnap.exists()) {
+          userRef = coinResellerRef
+          currentUserData = coinResellerSnap.data()
+          currentCoins = currentUserData?.coins || 0
+        } else {
+          // If not in coinResellers, try users collection
+          const userRef2 = doc(db, 'users', foundUser.id)
+          const userSnap2 = await getDoc(userRef2)
+          
+          if (userSnap2.exists()) {
+            userRef = userRef2
+            currentUserData = userSnap2.data()
+            currentCoins = currentUserData?.coins || 0
+          } else {
+            // If still not found, search by numericUserId
+            const usersRef = collection(db, 'users')
+            const usersQuery = query(usersRef, where('numericUserId', '==', foundUser.numericUserId))
+            const usersSnapshot = await getDocs(usersQuery)
+            
+            if (!usersSnapshot.empty) {
+              const userDoc = usersSnapshot.docs[0]
+              userRef = doc(db, 'users', userDoc.id)
+              currentUserData = userDoc.data()
+              currentCoins = currentUserData?.coins || 0
+              // Update foundUser.id to match the actual document ID
+              foundUser.id = userDoc.id
+            } else {
+              throw new Error('Coin reseller document not found in coinResellers or users collection')
+            }
+          }
+        }
+      } else {
+        // Regular user - use users collection
+        userRef = doc(db, 'users', foundUser.id)
+        const userSnap = await getDoc(userRef)
+        
+        if (!userSnap.exists()) {
+          throw new Error('User document not found')
+        }
+        
+        currentUserData = userSnap.data()
+        currentCoins = currentUserData?.coins || 0
+      }
       
       // Calculate new coin balance
       const newCoins = transactionType === 'Credit' 
         ? currentCoins + amountNum 
         : Math.max(0, currentCoins - amountNum) // Prevent negative coins
       
-      // Update user's coins in users collection
+      // Update user/reseller's coins
       await updateDoc(userRef, {
         coins: newCoins,
         updatedAt: serverTimestamp()
       })
       
-      console.log(`✅ Updated user ${foundUser.id}: ${currentCoins} → ${newCoins} coins`)
+      console.log(`✅ Updated ${isCoinReseller ? 'coin reseller' : 'user'} ${foundUser.id}: ${currentCoins} → ${newCoins} coins`)
+      
+      // For coin resellers, ALWAYS update BOTH collections (coinResellers AND users)
+      // This ensures the coin reseller app can read from either collection
+      if (isCoinReseller) {
+        try {
+          // Update coinResellers collection
+          const coinResellersRef = collection(db, 'coinResellers')
+          const coinResellersQuery = query(coinResellersRef, where('numericUserId', '==', foundUser.numericUserId))
+          const coinResellersSnapshot = await getDocs(coinResellersQuery)
+          
+          if (!coinResellersSnapshot.empty) {
+            await updateDoc(doc(db, 'coinResellers', coinResellersSnapshot.docs[0].id), {
+              coins: newCoins,
+              updatedAt: serverTimestamp()
+            })
+            console.log('✅ Updated coinResellers collection for coin reseller')
+          } else {
+            console.log('⚠️ Coin reseller not found in coinResellers collection')
+          }
+          
+          // Update users collection (coin reseller app might read from here)
+          const usersRef = collection(db, 'users')
+          const usersQuery = query(usersRef, where('numericUserId', '==', foundUser.numericUserId))
+          const usersSnapshot = await getDocs(usersQuery)
+          
+          if (!usersSnapshot.empty) {
+            await updateDoc(doc(db, 'users', usersSnapshot.docs[0].id), {
+              coins: newCoins,
+              updatedAt: serverTimestamp()
+            })
+            console.log('✅ Updated users collection for coin reseller')
+          } else {
+            // If coin reseller doesn't exist in users collection, create it
+            console.log('⚠️ Coin reseller not found in users collection, creating...')
+            try {
+              await addDoc(usersRef, {
+                name: foundUser.name,
+                displayName: foundUser.name,
+                email: foundUser.email,
+                numericUserId: foundUser.numericUserId,
+                role: 'CoinReseller',
+                accountType: 'CoinReseller',
+                coins: newCoins,
+                blocked: false,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+              })
+              console.log('✅ Created coin reseller in users collection')
+            } catch (createError) {
+              console.log('Could not create coin reseller in users collection:', createError)
+            }
+          }
+        } catch (e) {
+          console.error('Error updating coin reseller collections:', e)
+          // Don't fail the transaction if this fails
+        }
+      }
 
       // ALWAYS create/update wallets collection (required for app)
       try {
         const walletsRef = collection(db, 'wallets')
-        const walletQuery = query(walletsRef, where('userId', '==', foundUser.id))
-        const walletSnapshot = await getDocs(walletQuery)
+        
+        // Try to find wallet by userId first
+        let walletQuery = query(walletsRef, where('userId', '==', foundUser.id))
+        let walletSnapshot = await getDocs(walletQuery)
+        
+        // If not found and we have numericUserId, try searching by numericUserId
+        if (walletSnapshot.empty && foundUser.numericUserId) {
+          walletQuery = query(walletsRef, where('numericUserId', '==', foundUser.numericUserId))
+          walletSnapshot = await getDocs(walletQuery)
+        }
         
         if (!walletSnapshot.empty) {
           // Update existing wallet
           const walletDoc = walletSnapshot.docs[0]
           await updateDoc(doc(db, 'wallets', walletDoc.id), {
+            userId: foundUser.id, // Ensure userId is set
+            numericUserId: foundUser.numericUserId || walletDoc.data().numericUserId || 'N/A',
+            userName: foundUser.name,
+            userEmail: foundUser.email,
             balance: newCoins,
             coins: newCoins, // Also add coins field for compatibility
+            role: isCoinReseller ? 'CoinReseller' : (walletDoc.data().role || 'User'),
             updatedAt: serverTimestamp()
           })
-          console.log(`✅ Updated wallet for user ${foundUser.id}: ${newCoins} coins`)
+          console.log(`✅ Updated wallet for ${isCoinReseller ? 'coin reseller' : 'user'} ${foundUser.id}: ${newCoins} coins`)
         } else {
           // Create new wallet document (REQUIRED for app to work)
           await addDoc(walletsRef, {
@@ -350,15 +554,16 @@ const Wallet = () => {
             userEmail: foundUser.email,
             balance: newCoins,
             coins: newCoins, // Both balance and coins for compatibility
+            role: isCoinReseller ? 'CoinReseller' : 'User',
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
           })
-          console.log(`✅ Created new wallet for user ${foundUser.id}: ${newCoins} coins`)
+          console.log(`✅ Created new wallet for ${isCoinReseller ? 'coin reseller' : 'user'} ${foundUser.id}: ${newCoins} coins`)
         }
       } catch (walletError) {
         // Log error but don't fail the transaction
         console.error('⚠️ Wallet update error (non-critical):', walletError)
-        // Still show success since user coins were updated
+        // Still show success since user/reseller coins were updated
       }
 
       // Add transaction record
@@ -372,6 +577,8 @@ const Wallet = () => {
         reason: reason,
         previousBalance: currentCoins,
         newBalance: newCoins,
+        role: isCoinReseller ? 'CoinReseller' : 'User',
+        accountType: isCoinReseller ? 'CoinReseller' : 'User',
         createdAt: serverTimestamp(),
         createdBy: 'admin'
       })
@@ -514,13 +721,13 @@ const Wallet = () => {
 
           {/* User ID Input */}
           <div>
-            <label className="block text-sm font-medium mb-2">Enter Numeric User ID</label>
+            <label className="block text-sm font-medium mb-2">Enter Numeric User ID or Coin Reseller ID</label>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={userId}
                 onChange={(e) => setUserId(e.target.value)}
-                placeholder="Enter unique Numeric User ID (e.g., 176197744680457)"
+                placeholder="Enter Numeric User ID or Coin Reseller ID"
                 className="input-field flex-1"
                 disabled={processing}
                 onKeyPress={(e) => {
@@ -539,7 +746,7 @@ const Wallet = () => {
               </button>
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              Enter the unique Numeric User ID (e.g., 176197744680457) that appears in the Users page
+              Enter the unique Numeric ID from Users page or Coin Reseller ID from CoinReseller page
             </p>
           </div>
 
@@ -557,16 +764,21 @@ const Wallet = () => {
                 <div>
                   <h3 className="font-bold text-lg">{foundUser.name}</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">{foundUser.email}</p>
+                  {foundUser.role === 'CoinReseller' && (
+                    <p className="text-xs text-purple-600 dark:text-purple-400 font-semibold mt-1">
+                      Coin Reseller
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div className="col-span-2">
-                  <span className="text-gray-600 dark:text-gray-400">User ID:</span>
+                  <span className="text-gray-600 dark:text-gray-400">Numeric ID:</span>
                   <span className="font-bold ml-2 text-primary-600 font-mono">{foundUser.numericUserId}</span>
                 </div>
                 <div>
                   <span className="text-gray-600 dark:text-gray-400">Role:</span>
-                  <span className="font-semibold ml-2">{foundUser.role}</span>
+                  <span className="font-semibold ml-2">{foundUser.role || 'User'}</span>
                 </div>
                 <div>
                   <span className="text-gray-600 dark:text-gray-400">Current Coins:</span>

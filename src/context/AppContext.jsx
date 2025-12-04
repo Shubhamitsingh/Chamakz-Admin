@@ -32,6 +32,9 @@ export const AppProvider = ({ children }) => {
   
   // New user registration counts
   const [newUsersCount, setNewUsersCount] = useState(0)
+  
+  // Unread chat messages count
+  const [unreadChatsCount, setUnreadChatsCount] = useState(0)
 
   // Listen to authentication state changes
   useEffect(() => {
@@ -112,6 +115,50 @@ export const AppProvider = ({ children }) => {
     )
 
     return () => unsubscribe()
+  }, [user])
+
+  // Listen to unread chat messages count in real-time
+  useEffect(() => {
+    if (!user) {
+      setUnreadChatsCount(0)
+      return
+    }
+
+    console.log('🔔 Setting up unread chats listener...')
+    const unsubscribe = onSnapshot(
+      collection(db, 'supportChats'),
+      (snapshot) => {
+        // Sum all unreadByAdmin counts from all chats
+        let totalUnread = 0
+        snapshot.docs.forEach(doc => {
+          const data = doc.data()
+          // Handle both number and undefined/null cases - ensure we get a valid number
+          let unread = 0
+          if (typeof data.unreadByAdmin === 'number') {
+            unread = data.unreadByAdmin
+          } else if (data.unreadByAdmin !== undefined && data.unreadByAdmin !== null) {
+            const parsed = parseInt(data.unreadByAdmin)
+            unread = isNaN(parsed) ? 0 : parsed
+          }
+          totalUnread += Math.max(0, unread) // Ensure non-negative
+          if (unread > 0) {
+            console.log(`📊 Chat ${doc.id}: unreadByAdmin = ${unread}`)
+          }
+        })
+        
+        console.log('💬 Total unread chat messages:', totalUnread, '(from', snapshot.size, 'chats)')
+        setUnreadChatsCount(Math.max(0, totalUnread))
+      },
+      (error) => {
+        console.error('❌ Error fetching unread chats count:', error)
+        setUnreadChatsCount(0)
+      }
+    )
+
+    return () => {
+      console.log('🔕 Unsubscribing from unread chats listener')
+      unsubscribe()
+    }
   }, [user])
 
   useEffect(() => {
@@ -243,6 +290,7 @@ export const AppProvider = ({ children }) => {
     markTicketsAsSeen,
     newUsersCount,
     markUsersAsSeen,
+    unreadChatsCount,
     // Actions
     updateUser,
     updateTicket,

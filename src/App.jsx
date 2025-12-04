@@ -11,7 +11,7 @@ import TicketsV2 from './pages/TicketsV2'
 import Chats from './pages/Chats'
 import Feedback from './pages/Feedback'
 import Approvals from './pages/Approvals'
-import Resellers from './pages/Resellers'
+import CoinReseller from './pages/CoinReseller'
 import Events from './pages/Events'
 import Settings from './pages/Settings'
 
@@ -41,7 +41,7 @@ function App() {
             <Route path="chats" element={<Chats />} />
             <Route path="feedback" element={<Feedback />} />
             <Route path="approvals" element={<Approvals />} />
-            <Route path="resellers" element={<Resellers />} />
+            <Route path="coinreseller" element={<CoinReseller />} />
             <Route path="events" element={<Events />} />
             <Route path="settings" element={<Settings />} />
           </Route>

@@ -28,11 +28,41 @@ const Table = ({ columns, data, onRowClick }) => {
                 onRowClick ? 'cursor-pointer' : ''
               }`}
             >
-              {columns.map((column, colIndex) => (
-                <td key={colIndex} className="px-4 py-3 text-sm">
-                  {column.render ? column.render(row) : row[column.accessor]}
-                </td>
-              ))}
+              {columns.map((column, colIndex) => {
+                let cellContent = null
+                if (column.render) {
+                  cellContent = column.render(row)
+                } else {
+                  const value = row[column.accessor]
+                  // Convert Firebase Timestamps and other objects to strings
+                  if (value && typeof value === 'object') {
+                    if (value.toDate && typeof value.toDate === 'function') {
+                      // Firebase Timestamp
+                      try {
+                        cellContent = new Date(value.toDate()).toLocaleDateString()
+                      } catch (e) {
+                        cellContent = 'N/A'
+                      }
+                    } else if (value.seconds !== undefined) {
+                      // Timestamp-like object
+                      try {
+                        cellContent = new Date(value.seconds * 1000).toLocaleDateString()
+                      } catch (e) {
+                        cellContent = 'N/A'
+                      }
+                    } else {
+                      cellContent = String(value)
+                    }
+                  } else {
+                    cellContent = value ?? 'N/A'
+                  }
+                }
+                return (
+                  <td key={colIndex} className="px-4 py-3 text-sm">
+                    {cellContent}
+                  </td>
+                )
+              })}
             </motion.tr>
           ))}
         </tbody>
