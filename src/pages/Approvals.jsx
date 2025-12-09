@@ -1,19 +1,86 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { CheckCircle, XCircle, Filter } from 'lucide-react'
+import { CheckCircle, XCircle, Filter, Loader as LoaderIcon } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import SearchBar from '../components/SearchBar'
 import Table from '../components/Table'
+import Loader from '../components/Loader'
+import { subscribeToCoinResellerApprovals, approveCoinReseller, rejectCoinReseller } from '../firebase/coinResellers'
 
 const Approvals = () => {
-  const { data, approveAccount, rejectAccount } = useApp()
+  const { showToast } = useApp()
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState('All')
+  const [approvals, setApprovals] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [processing, setProcessing] = useState(false)
 
-  const filteredApprovals = data.pendingApprovals.filter(approval => {
+  // Fetch approvals from Firebase
+  useEffect(() => {
+    const unsubscribe = subscribeToCoinResellerApprovals((approvalsData) => {
+      const processedApprovals = approvalsData
+        .filter(approval => approval.status === 'pending')
+        .map(approval => {
+          const data = approval
+          return {
+            id: approval.id,
+            name: data.name || data.userName || 'Unknown',
+            email: data.email || 'No email',
+            type: 'Reseller', // All approvals are for coin resellers
+            appliedDate: data.createdAt ? (data.createdAt.toDate ? new Date(data.createdAt.toDate()).toLocaleDateString() : new Date(data.createdAt).toLocaleDateString()) : 'N/A',
+            documents: data.documentsVerified ? 'Verified' : 'Pending',
+            status: data.status || 'pending',
+            numericUserId: data.numericUserId || 'N/A',
+            phone: data.phone || '',
+            region: data.region || ''
+          }
+        })
+      setApprovals(processedApprovals)
+      setLoading(false)
+    })
+
+    return () => unsubscribe()
+  }, [])
+
+  const handleApprove = async (approvalId) => {
+    setProcessing(true)
+    try {
+      const result = await approveCoinReseller(approvalId)
+      if (result.success) {
+        showToast('Account approved successfully!', 'success')
+      } else {
+        showToast(result.error || 'Error approving account', 'error')
+      }
+    } catch (error) {
+      console.error('Error approving:', error)
+      showToast('Error approving account', 'error')
+    }
+    setProcessing(false)
+  }
+
+  const handleReject = async (approvalId) => {
+    if (!window.confirm('Are you sure you want to reject this account request?')) {
+      return
+    }
+    setProcessing(true)
+    try {
+      const result = await rejectCoinReseller(approvalId)
+      if (result.success) {
+        showToast('Account rejected', 'success')
+      } else {
+        showToast(result.error || 'Error rejecting account', 'error')
+      }
+    } catch (error) {
+      console.error('Error rejecting:', error)
+      showToast('Error rejecting account', 'error')
+    }
+    setProcessing(false)
+  }
+
+  const filteredApprovals = approvals.filter(approval => {
     const matchesSearch = approval.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           approval.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          approval.id.toString().includes(searchTerm)
+                          (approval.numericUserId && approval.numericUserId.toString().includes(searchTerm))
     const matchesFilter = filterType === 'All' || approval.type === filterType
     return matchesSearch && matchesFilter && approval.status === 'pending'
   })
@@ -21,11 +88,16 @@ const Approvals = () => {
   const columns = [
     {
       header: 'User ID',
-      accessor: 'id',
+      accessor: 'numericUserId',
       render: (row) => (
-        <span className="font-mono text-sm font-semibold text-primary-600 dark:text-primary-400">
-          {row.id}
-        </span>
+        <div>
+          <span className="font-mono text-sm font-semibold text-primary-600 dark:text-primary-400 block">
+            {row.numericUserId || 'N/A'}
+          </span>
+          <span className="text-xs text-gray-500 font-mono">
+            Doc: {row.id.substring(0, 8)}...
+          </span>
+        </div>
       ),
     },
     {
@@ -71,16 +143,18 @@ const Approvals = () => {
       render: (row) => (
         <div className="flex gap-2">
           <button
-            onClick={() => approveAccount(row.id)}
-            className="p-2 bg-green-50 hover:bg-green-100 text-green-600 rounded-lg transition-colors"
+            onClick={() => handleApprove(row.id)}
+            className="p-2 bg-green-50 hover:bg-green-100 text-green-600 rounded-lg transition-colors disabled:opacity-50"
             title="Approve"
+            disabled={processing}
           >
             <CheckCircle className="w-4 h-4" />
           </button>
           <button
-            onClick={() => rejectAccount(row.id)}
-            className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors"
+            onClick={() => handleReject(row.id)}
+            className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors disabled:opacity-50"
             title="Reject"
+            disabled={processing}
           >
             <XCircle className="w-4 h-4" />
           </button>
@@ -129,9 +203,9 @@ const Approvals = () => {
               <span className="text-2xl">👤</span>
             </div>
             <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">User Registrations</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Total Applications</p>
               <p className="text-2xl font-bold">
-                {data.pendingApprovals.filter(a => a.type === 'User').length}
+                {approvals.length}
               </p>
             </div>
           </div>
@@ -150,7 +224,7 @@ const Approvals = () => {
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Reseller Applications</p>
               <p className="text-2xl font-bold">
-                {data.pendingApprovals.filter(a => a.type === 'Reseller').length}
+                {approvals.filter(a => a.type === 'Reseller').length}
               </p>
             </div>
           </div>
@@ -186,23 +260,29 @@ const Approvals = () => {
       </motion.div>
 
       {/* Approvals Table */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-        className="card"
-      >
-        <h2 className="text-xl font-bold mb-4">Pending Approvals ({filteredApprovals.length})</h2>
-        {filteredApprovals.length > 0 ? (
-          <Table columns={columns} data={filteredApprovals} />
-        ) : (
-          <div className="text-center py-12">
-            <div className="text-6xl mb-4">🎉</div>
-            <p className="text-xl font-medium mb-2">All caught up!</p>
-            <p className="text-gray-600 dark:text-gray-400">No pending approvals at the moment.</p>
-          </div>
-        )}
-      </motion.div>
+      {loading ? (
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader />
+        </div>
+      ) : (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="card"
+        >
+          <h2 className="text-xl font-bold mb-4">Pending Approvals ({filteredApprovals.length})</h2>
+          {filteredApprovals.length > 0 ? (
+            <Table columns={columns} data={filteredApprovals} />
+          ) : (
+            <div className="text-center py-12">
+              <div className="text-6xl mb-4">🎉</div>
+              <p className="text-xl font-medium mb-2">All caught up!</p>
+              <p className="text-gray-600 dark:text-gray-400">No pending approvals at the moment.</p>
+            </div>
+          )}
+        </motion.div>
+      )}
     </div>
   )
 }

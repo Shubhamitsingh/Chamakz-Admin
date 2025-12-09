@@ -1,10 +1,13 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Save, Upload, Shield, Database, Bell, Palette } from 'lucide-react'
 import { useApp } from '../context/AppContext'
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore'
+import { updatePassword } from 'firebase/auth'
+import { db, auth } from '../firebase/config'
 
 const Settings = () => {
-  const { darkMode, toggleDarkMode, showToast } = useApp()
+  const { darkMode, toggleDarkMode, showToast, user } = useApp()
   const [settings, setSettings] = useState({
     appName: 'Chamak Admin',
     supportEmail: 'support@chamakadmin.com',
@@ -15,9 +18,86 @@ const Settings = () => {
     emailAlerts: true,
     smsAlerts: false,
   })
+  const [passwordData, setPasswordData] = useState({
+    newPassword: '',
+    confirmPassword: '',
+  })
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
 
-  const handleSave = () => {
-    showToast('Settings saved successfully')
+  // Load settings from Firebase
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const settingsRef = doc(db, 'settings', 'general')
+        const settingsSnap = await getDoc(settingsRef)
+        
+        if (settingsSnap.exists()) {
+          setSettings(prev => ({
+            ...prev,
+            ...settingsSnap.data()
+          }))
+        }
+      } catch (error) {
+        console.log('Settings not found, using defaults')
+      }
+      setLoading(false)
+    }
+
+    loadSettings()
+  }, [])
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      // Save to Firebase
+      const settingsRef = doc(db, 'settings', 'general')
+      await setDoc(settingsRef, {
+        ...settings,
+        updatedAt: new Date().toISOString()
+      }, { merge: true })
+
+      // Also save to localStorage as backup
+      localStorage.setItem('adminSettings', JSON.stringify(settings))
+
+      showToast('Settings saved successfully', 'success')
+    } catch (error) {
+      console.error('Error saving settings:', error)
+      showToast('Error saving settings', 'error')
+    }
+    setSaving(false)
+  }
+
+  const handlePasswordChange = async () => {
+    if (!passwordData.newPassword || !passwordData.confirmPassword) {
+      showToast('Please fill all password fields', 'error')
+      return
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      showToast('Passwords do not match', 'error')
+      return
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      showToast('Password must be at least 6 characters', 'error')
+      return
+    }
+
+    setSaving(true)
+    try {
+      if (auth.currentUser) {
+        await updatePassword(auth.currentUser, passwordData.newPassword)
+        showToast('Password changed successfully', 'success')
+        setPasswordData({ newPassword: '', confirmPassword: '' })
+      } else {
+        showToast('You must be logged in to change password', 'error')
+      }
+    } catch (error) {
+      console.error('Error changing password:', error)
+      showToast(`Error changing password: ${error.message}`, 'error')
+    }
+    setSaving(false)
   }
 
   return (
@@ -177,14 +257,27 @@ const Settings = () => {
                 <label className="block text-sm font-medium mb-2">Change Password</label>
                 <input
                   type="password"
+                  value={passwordData.newPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
                   placeholder="New password"
                   className="input-field mb-2"
+                  disabled={saving}
                 />
                 <input
                   type="password"
+                  value={passwordData.confirmPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
                   placeholder="Confirm password"
-                  className="input-field"
+                  className="input-field mb-2"
+                  disabled={saving}
                 />
+                <button
+                  onClick={handlePasswordChange}
+                  disabled={saving || !passwordData.newPassword || !passwordData.confirmPassword}
+                  className="btn-secondary text-sm disabled:opacity-50"
+                >
+                  {saving ? 'Changing...' : 'Change Password'}
+                </button>
               </div>
             </div>
           </motion.div>
@@ -255,10 +348,20 @@ const Settings = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
             onClick={handleSave}
-            className="btn-primary w-full py-4 text-lg flex items-center justify-center gap-2"
+            disabled={saving || loading}
+            className="btn-primary w-full py-4 text-lg flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            <Save className="w-5 h-5" />
-            Save All Settings
+            {saving ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="w-5 h-5" />
+                Save All Settings
+              </>
+            )}
           </motion.button>
         </div>
       </div>

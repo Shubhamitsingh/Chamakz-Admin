@@ -1,18 +1,25 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Mail, Lock, Eye, EyeOff, LogIn, AlertCircle } from 'lucide-react'
-import { loginAdmin } from '../firebase/auth'
+import { Mail, Lock, Eye, EyeOff, LogIn, AlertCircle, CheckCircle } from 'lucide-react'
+import { loginAdmin, resetPassword } from '../firebase/auth'
 import { useNavigate } from 'react-router-dom'
 
 const Login = () => {
   const navigate = useNavigate()
   const [formData, setFormData] = useState({
-    email: '',
+    email: localStorage.getItem('rememberedEmail') || '',
     password: '',
   })
   const [showPassword, setShowPassword] = useState(false)
+  const [rememberMe, setRememberMe] = useState(() => {
+    return localStorage.getItem('rememberMe') === 'true'
+  })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showPasswordReset, setShowPasswordReset] = useState(false)
+  const [resetEmail, setResetEmail] = useState('')
+  const [resetLoading, setResetLoading] = useState(false)
+  const [resetSuccess, setResetSuccess] = useState(false)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -22,6 +29,15 @@ const Login = () => {
     const result = await loginAdmin(formData.email, formData.password)
 
     if (result.success) {
+      // Save remember me preference
+      if (rememberMe) {
+        localStorage.setItem('rememberMe', 'true')
+        localStorage.setItem('rememberedEmail', formData.email)
+      } else {
+        localStorage.removeItem('rememberMe')
+        localStorage.removeItem('rememberedEmail')
+      }
+      
       // Login successful - redirect to dashboard
       navigate('/dashboard')
     } else {
@@ -30,6 +46,32 @@ const Login = () => {
     }
 
     setLoading(false)
+  }
+
+  const handlePasswordReset = async (e) => {
+    e.preventDefault()
+    if (!resetEmail) {
+      setError('Please enter your email address')
+      return
+    }
+
+    setResetLoading(true)
+    setError('')
+    
+    const result = await resetPassword(resetEmail)
+    
+    if (result.success) {
+      setResetSuccess(true)
+      setTimeout(() => {
+        setShowPasswordReset(false)
+        setResetEmail('')
+        setResetSuccess(false)
+      }, 3000)
+    } else {
+      setError(result.error || 'Failed to send password reset email')
+    }
+    
+    setResetLoading(false)
   }
 
   const handleChange = (e) => {
@@ -148,18 +190,23 @@ const Login = () => {
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
                   className="w-4 h-4 text-primary-600 rounded focus:ring-2 focus:ring-primary-500"
+                  disabled={loading}
                 />
                 <span className="text-gray-600 dark:text-gray-400">
                   Remember me
                 </span>
               </label>
-              <a
-                href="#"
+              <button
+                type="button"
+                onClick={() => setShowPasswordReset(true)}
                 className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 font-medium"
+                disabled={loading}
               >
                 Forgot password?
-              </a>
+              </button>
             </div>
 
             {/* Submit Button */}
@@ -200,6 +247,82 @@ const Login = () => {
           Chamak Admin Panel v1.0.0
         </motion.div>
       </motion.div>
+
+      {/* Password Reset Modal */}
+      {showPasswordReset && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+          onClick={() => !resetLoading && setShowPasswordReset(false)}
+        >
+          <motion.div
+            initial={{ scale: 0.95 }}
+            animate={{ scale: 1 }}
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full shadow-xl"
+          >
+            <h2 className="text-2xl font-bold mb-4">Reset Password</h2>
+            
+            {resetSuccess ? (
+              <div className="text-center py-4">
+                <div className="w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
+                </div>
+                <p className="text-lg font-medium mb-2">Email Sent!</p>
+                <p className="text-gray-600 dark:text-gray-400">
+                  Check your email for password reset instructions.
+                </p>
+              </div>
+            ) : (
+              <>
+                <p className="text-gray-600 dark:text-gray-400 mb-4">
+                  Enter your email address and we'll send you a link to reset your password.
+                </p>
+                
+                {error && (
+                  <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                    <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+                  </div>
+                )}
+                
+                <form onSubmit={handlePasswordReset} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Email Address</label>
+                    <input
+                      type="email"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      placeholder="admin@chamak.com"
+                      className="input-field w-full"
+                      required
+                      disabled={resetLoading}
+                    />
+                  </div>
+                  
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowPasswordReset(false)}
+                      className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                      disabled={resetLoading}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={resetLoading || !resetEmail}
+                      className="flex-1 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {resetLoading ? 'Sending...' : 'Send Reset Link'}
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
+          </motion.div>
+        </motion.div>
+      )}
     </div>
   )
 }
