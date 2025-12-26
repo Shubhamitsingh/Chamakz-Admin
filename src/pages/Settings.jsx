@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Save, Upload, Shield, Database, Bell, Palette } from 'lucide-react'
+import { Save, Upload, Shield, Bell, Palette } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore'
-import { updatePassword } from 'firebase/auth'
-import { db, auth } from '../firebase/config'
+import { updatePassword, updateProfile } from 'firebase/auth'
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
+import { db, auth, storage } from '../firebase/config'
 
 const Settings = () => {
   const { darkMode, toggleDarkMode, showToast, user } = useApp()
@@ -24,6 +25,9 @@ const Settings = () => {
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [avatarFile, setAvatarFile] = useState(null)
+  const [avatarPreview, setAvatarPreview] = useState(null)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
 
   // Load settings from Firebase
   useEffect(() => {
@@ -33,10 +37,20 @@ const Settings = () => {
         const settingsSnap = await getDoc(settingsRef)
         
         if (settingsSnap.exists()) {
+          const data = settingsSnap.data()
           setSettings(prev => ({
             ...prev,
-            ...settingsSnap.data()
+            ...data
           }))
+          // Set avatar preview if exists
+          if (data.adminAvatar) {
+            setAvatarPreview(data.adminAvatar)
+          }
+        }
+        
+        // Also check Firebase Auth profile for avatar
+        if (auth.currentUser?.photoURL) {
+          setAvatarPreview(auth.currentUser.photoURL)
         }
       } catch (error) {
         console.log('Settings not found, using defaults')
@@ -100,8 +114,77 @@ const Settings = () => {
     setSaving(false)
   }
 
+  const handleAvatarChange = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        showToast('Please select an image file', 'error')
+        return
+      }
+      
+      if (file.size > 5 * 1024 * 1024) {
+        showToast('File size must be less than 5MB', 'error')
+        return
+      }
+      
+      setAvatarFile(file)
+      
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setAvatarPreview(reader.result)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleAvatarUpload = async () => {
+    if (!avatarFile) {
+      showToast('Please select an image to upload', 'error')
+      return
+    }
+
+    setUploadingAvatar(true)
+    try {
+      const timestamp = Date.now()
+      // Use sanitized filename (remove spaces and special chars)
+      const sanitizedName = avatarFile.name.replace(/[^a-zA-Z0-9.-]/g, '_')
+      const filename = `admin_avatars/${auth.currentUser?.uid || 'admin'}/${timestamp}_${sanitizedName}`
+      const storageRef = ref(storage, filename)
+      
+      await uploadBytes(storageRef, avatarFile)
+      const downloadURL = await getDownloadURL(storageRef)
+      
+      // Update settings in Firestore
+      const settingsRef = doc(db, 'settings', 'general')
+      await updateDoc(settingsRef, {
+        adminAvatar: downloadURL,
+        updatedAt: new Date().toISOString()
+      })
+      
+      // Update Firebase Auth profile
+      if (auth.currentUser) {
+        await updateProfile(auth.currentUser, {
+          photoURL: downloadURL
+        })
+      }
+      
+      // Update local state
+      setSettings(prev => ({
+        ...prev,
+        adminAvatar: downloadURL
+      }))
+      
+      setAvatarFile(null)
+      showToast('Avatar uploaded successfully!', 'success')
+    } catch (error) {
+      console.error('Error uploading avatar:', error)
+      showToast(`Error uploading avatar: ${error.message}`, 'error')
+    }
+    setUploadingAvatar(false)
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -111,32 +194,7 @@ const Settings = () => {
         <p className="text-gray-600 dark:text-gray-400">Manage application settings and preferences</p>
       </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Settings Menu */}
-        <div className="space-y-2">
-          {[
-            { icon: Palette, label: 'General Settings', id: 'general' },
-            { icon: Shield, label: 'Admin Profile', id: 'profile' },
-            { icon: Bell, label: 'Notifications', id: 'notifications' },
-            { icon: Database, label: 'System', id: 'system' },
-          ].map((item, index) => (
-            <motion.button
-              key={item.id}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.1 }}
-              className="w-full card hover:shadow-lg transition-all flex items-center gap-3 text-left"
-            >
-              <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-lg flex items-center justify-center">
-                <item.icon className="w-5 h-5 text-white" />
-              </div>
-              <span className="font-medium">{item.label}</span>
-            </motion.button>
-          ))}
-        </div>
-
-        {/* Settings Content */}
-        <div className="lg:col-span-2 space-y-6">
+      <div className="space-y-6">
           {/* General Settings */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -224,13 +282,39 @@ const Settings = () => {
 
             <div className="space-y-4">
               <div className="flex items-center gap-4 mb-4">
-                <div className="w-20 h-20 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-full flex items-center justify-center text-white font-bold text-2xl">
-                  A
+                {avatarPreview ? (
+                  <img 
+                    src={avatarPreview} 
+                    alt="Admin Avatar" 
+                    className="w-20 h-20 rounded-full object-cover border-2 border-primary-500"
+                  />
+                ) : (
+                  <div className="w-20 h-20 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-full flex items-center justify-center text-white font-bold text-2xl">
+                    {settings.adminName ? settings.adminName.charAt(0).toUpperCase() : 'A'}
+                  </div>
+                )}
+                <div className="flex flex-col gap-2">
+                  <label className="btn-secondary cursor-pointer">
+                    <Upload className="w-4 h-4 mr-2" />
+                    {avatarFile ? 'Change Image' : 'Upload Avatar'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAvatarChange}
+                      className="hidden"
+                      disabled={uploadingAvatar}
+                    />
+                  </label>
+                  {avatarFile && (
+                    <button
+                      onClick={handleAvatarUpload}
+                      disabled={uploadingAvatar}
+                      className="btn-primary text-sm disabled:opacity-50"
+                    >
+                      {uploadingAvatar ? 'Uploading...' : 'Save Avatar'}
+                    </button>
+                  )}
                 </div>
-                <button className="btn-secondary">
-                  <Upload className="w-4 h-4 mr-2" />
-                  Change Avatar
-                </button>
               </div>
 
               <div>
@@ -315,33 +399,6 @@ const Settings = () => {
             </div>
           </motion.div>
 
-          {/* System Settings */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="card"
-          >
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-red-600 rounded-lg flex items-center justify-center">
-                <Database className="w-5 h-5 text-white" />
-              </div>
-              <h2 className="text-xl font-bold">System Management</h2>
-            </div>
-
-            <div className="space-y-3">
-              <button className="w-full p-4 border-2 border-blue-500 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors font-medium">
-                🔄 Backup Database
-              </button>
-              <button className="w-full p-4 border-2 border-yellow-500 text-yellow-600 dark:text-yellow-400 rounded-lg hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors font-medium">
-                ⚡ Clear Cache
-              </button>
-              <button className="w-full p-4 border-2 border-red-500 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors font-medium">
-                🔄 Reset Application
-              </button>
-            </div>
-          </motion.div>
-
           {/* Save Button */}
           <motion.button
             initial={{ opacity: 0, y: 20 }}
@@ -363,7 +420,6 @@ const Settings = () => {
               </>
             )}
           </motion.button>
-        </div>
       </div>
     </div>
   )

@@ -3,8 +3,9 @@ import { Search, Bell, Moon, Sun, Menu, X } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import { collection, query, orderBy, limit, onSnapshot, where, getDocs } from 'firebase/firestore'
-import { db } from '../firebase/config'
+import { collection, query, orderBy, limit, onSnapshot, where, getDocs, doc } from 'firebase/firestore'
+import { db, auth } from '../firebase/config'
+import { onAuthStateChanged } from 'firebase/auth'
 
 const TopNav = () => {
   const { darkMode, toggleDarkMode, toggleSidebar, user, newUsersCount, openTicketsCount } = useApp()
@@ -16,6 +17,8 @@ const TopNav = () => {
   const [showSearchResults, setShowSearchResults] = useState(false)
   const [searchResults, setSearchResults] = useState({ users: [], tickets: [], transactions: [] })
   const [searching, setSearching] = useState(false)
+  const [adminAvatar, setAdminAvatar] = useState(null)
+  const [adminName, setAdminName] = useState('Admin User')
 
   // Fetch real-time notifications from Firebase
   useEffect(() => {
@@ -93,6 +96,48 @@ const TopNav = () => {
   useEffect(() => {
     setUnreadCount(newUsersCount + openTicketsCount)
   }, [newUsersCount, openTicketsCount])
+
+  // Listen to admin avatar and profile updates
+  useEffect(() => {
+    // Check initial Firebase Auth photoURL
+    if (auth.currentUser?.photoURL) {
+      setAdminAvatar(auth.currentUser.photoURL)
+    }
+    if (auth.currentUser?.displayName) {
+      setAdminName(auth.currentUser.displayName)
+    }
+
+    // Listen to Firebase Auth photoURL changes
+    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
+      if (currentUser?.photoURL) {
+        setAdminAvatar(currentUser.photoURL)
+      }
+      if (currentUser?.displayName) {
+        setAdminName(currentUser.displayName)
+      }
+    })
+
+    // Listen to settings document for admin avatar and name
+    const settingsRef = doc(db, 'settings', 'general')
+    const unsubscribeSettings = onSnapshot(settingsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data()
+        if (data.adminAvatar) {
+          setAdminAvatar(data.adminAvatar)
+        }
+        if (data.adminName) {
+          setAdminName(data.adminName)
+        }
+      }
+    }, (error) => {
+      console.log('Error fetching admin settings:', error)
+    })
+
+    return () => {
+      unsubscribeAuth()
+      unsubscribeSettings()
+    }
+  }, [])
 
   // Global search functionality
   useEffect(() => {
@@ -423,12 +468,21 @@ const TopNav = () => {
           {/* Profile */}
           <div className="flex items-center gap-3 ml-2 pl-2 border-l border-gray-300 dark:border-gray-600">
             <div className="text-right hidden md:block">
-              <p className="text-sm font-medium">Admin User</p>
-              <p className="text-xs text-gray-500">{user?.email || 'admin@chamakadmin.com'}</p>
+              <p className="text-sm font-medium">{adminName}</p>
+              <p className="text-xs text-gray-500">{user?.email || auth.currentUser?.email || 'admin@chamakadmin.com'}</p>
             </div>
-            <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-full flex items-center justify-center text-white font-bold cursor-pointer">
-              {user?.email?.charAt(0).toUpperCase() || 'A'}
-            </div>
+            {adminAvatar ? (
+              <img 
+                src={adminAvatar} 
+                alt="Admin Avatar" 
+                className="w-10 h-10 rounded-full object-cover border-2 border-primary-500 cursor-pointer"
+                onError={() => setAdminAvatar(null)}
+              />
+            ) : (
+              <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-full flex items-center justify-center text-white font-bold cursor-pointer">
+                {adminName.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'A'}
+              </div>
+            )}
           </div>
         </div>
       </div>

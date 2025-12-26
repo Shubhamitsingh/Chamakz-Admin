@@ -4,6 +4,7 @@ import { CheckCircle, XCircle, Filter, Loader as LoaderIcon } from 'lucide-react
 import { useApp } from '../context/AppContext'
 import SearchBar from '../components/SearchBar'
 import Table from '../components/Table'
+import Modal from '../components/Modal'
 import Loader from '../components/Loader'
 import { subscribeToCoinResellerApprovals, approveCoinReseller, rejectCoinReseller } from '../firebase/coinResellers'
 
@@ -14,6 +15,8 @@ const Approvals = () => {
   const [approvals, setApprovals] = useState([])
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
+  const [showRejectConfirm, setShowRejectConfirm] = useState(false)
+  const [approvalToReject, setApprovalToReject] = useState(null)
 
   // Fetch approvals from Firebase
   useEffect(() => {
@@ -58,15 +61,21 @@ const Approvals = () => {
     setProcessing(false)
   }
 
-  const handleReject = async (approvalId) => {
-    if (!window.confirm('Are you sure you want to reject this account request?')) {
-      return
-    }
+  const handleReject = (approvalId) => {
+    setApprovalToReject(approvalId)
+    setShowRejectConfirm(true)
+  }
+
+  const confirmReject = async () => {
+    if (!approvalToReject) return
+    
     setProcessing(true)
+    setShowRejectConfirm(false)
     try {
-      const result = await rejectCoinReseller(approvalId)
+      const result = await rejectCoinReseller(approvalToReject)
       if (result.success) {
         showToast('Account rejected', 'success')
+        setApprovalToReject(null)
       } else {
         showToast(result.error || 'Error rejecting account', 'error')
       }
@@ -283,6 +292,40 @@ const Approvals = () => {
           )}
         </motion.div>
       )}
+
+      {/* Reject Confirmation Modal */}
+      <Modal
+        isOpen={showRejectConfirm}
+        onClose={() => {
+          setShowRejectConfirm(false)
+          setApprovalToReject(null)
+        }}
+        title="Confirm Rejection"
+      >
+        <div className="space-y-4">
+          <p className="text-gray-600 dark:text-gray-400">
+            Are you sure you want to reject this account request? This action cannot be undone.
+          </p>
+          <div className="flex gap-3 pt-4">
+            <button
+              onClick={() => {
+                setShowRejectConfirm(false)
+                setApprovalToReject(null)
+              }}
+              className="flex-1 px-4 py-2.5 border-2 border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors font-semibold"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmReject}
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-lg font-semibold transition-colors disabled:opacity-50"
+              disabled={processing}
+            >
+              {processing ? 'Rejecting...' : 'Confirm Reject'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

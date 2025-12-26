@@ -1,0 +1,59 @@
+rules_version = '2';
+// Firebase Storage Security Rules
+// Allow authenticated users to upload/read their own profile pictures and cover photos
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Profile pictures: profile_pictures/{userId}/profile_{userId}.jpg
+    match /profile_pictures/{userId}/{fileName} {
+      // Allow read: anyone can view profile pictures
+      allow read: if true;
+      // Allow write: only the owner can upload/update their profile picture
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Cover photos: cover_photos/{userId}/cover_{userId}_{index}.jpg
+    match /cover_photos/{userId}/{fileName} {
+      // Allow read: anyone can view cover photos
+      allow read: if true;
+      // Allow write: only the owner can upload/update their cover photos
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Chat images: chat_images/{userId}/chat_{userId}_{timestamp}.jpg
+    match /chat_images/{userId}/{fileName} {
+      // Allow read: anyone can view chat images
+      allow read: if true;
+      // Allow write: only authenticated users can upload chat images
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Admin avatars: admin_avatars/{userId}/{fileName}
+    match /admin_avatars/{userId}/{allPaths=**} {
+      // Allow read: authenticated users can view admin avatars
+      allow read: if request.auth != null;
+      // Allow write: only the authenticated admin can upload/update their avatar
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Payment proofs: payment_proofs/{allPaths=**}
+    match /payment_proofs/{allPaths=**} {
+      // Allow read: authenticated admins can view payment proofs
+      allow read: if request.auth != null;
+      // Allow write: authenticated admins can upload payment proofs
+      allow write: if request.auth != null;
+    }
+    
+    // Admin files: admin_files/{allPaths=**}
+    match /admin_files/{allPaths=**} {
+      // Allow read: authenticated admins can view admin files
+      allow read: if request.auth != null;
+      // Allow write: authenticated admins can upload admin files
+      allow write: if request.auth != null;
+    }
+    
+    // Default: deny all other access
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

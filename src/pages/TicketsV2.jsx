@@ -10,12 +10,14 @@ import { collection, getDocs, getDoc, doc, updateDoc, deleteDoc, query, collecti
 import { db } from '../firebase/config'
 
 const TicketsV2 = () => {
-  const { markTicketsAsSeen } = useApp()
+  const { markTicketsAsSeen, showToast } = useApp()
   const [activeTab, setActiveTab] = useState('in-progress') // 'in-progress' or 'resolved'
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('All')
   const [selectedTicket, setSelectedTicket] = useState(null)
   const [showTicketModal, setShowTicketModal] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [ticketToDelete, setTicketToDelete] = useState(null)
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
   const [tickets, setTickets] = useState([])
@@ -255,26 +257,29 @@ const TicketsV2 = () => {
         setActiveTab('resolved')
       }
     } catch (error) {
-      console.error('Error updating ticket:', error)
-      alert('❌ Error updating ticket status')
+      showToast('Error updating ticket status', 'error')
     }
     setProcessing(false)
   }
 
-  const handleDeleteTicket = async (ticketId) => {
-    if (!window.confirm('Are you sure you want to delete this ticket? This action cannot be undone.')) {
-      return
-    }
+  const handleDeleteTicket = (ticketId) => {
+    setTicketToDelete(ticketId)
+    setShowDeleteConfirm(true)
+  }
+
+  const confirmDeleteTicket = async () => {
+    if (!ticketToDelete) return
 
     setProcessing(true)
+    setShowDeleteConfirm(false)
     try {
-      const ticketRef = doc(db, 'supportTickets', ticketId)
+      const ticketRef = doc(db, 'supportTickets', ticketToDelete)
       await deleteDoc(ticketRef)
       setShowTicketModal(false)
-      alert('✅ Ticket deleted successfully!')
+      setTicketToDelete(null)
+      showToast('Ticket deleted successfully!', 'success')
     } catch (error) {
-      console.error('Error deleting ticket:', error)
-      alert('❌ Error deleting ticket')
+      showToast('Error deleting ticket', 'error')
     }
     setProcessing(false)
   }
@@ -636,6 +641,40 @@ const TicketsV2 = () => {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false)
+          setTicketToDelete(null)
+        }}
+        title="Confirm Delete"
+      >
+        <div className="space-y-4">
+          <p className="text-gray-600 dark:text-gray-400">
+            Are you sure you want to delete this ticket? This action cannot be undone.
+          </p>
+          <div className="flex gap-3 pt-4">
+            <button
+              onClick={() => {
+                setShowDeleteConfirm(false)
+                setTicketToDelete(null)
+              }}
+              className="flex-1 px-4 py-2.5 border-2 border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors font-semibold"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmDeleteTicket}
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-lg font-semibold transition-colors disabled:opacity-50"
+              disabled={processing}
+            >
+              {processing ? 'Deleting...' : 'Delete Ticket'}
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   )

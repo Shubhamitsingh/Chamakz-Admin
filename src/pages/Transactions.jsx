@@ -1,19 +1,22 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { DollarSign, Upload, CheckCircle, Clock, XCircle, Eye, Search, Filter } from 'lucide-react'
+import { DollarSign, Upload, CheckCircle, Clock, XCircle, Eye, Search, Filter, Coins } from 'lucide-react'
 import SearchBar from '../components/SearchBar'
 import Table from '../components/Table'
 import Modal from '../components/Modal'
 import Loader from '../components/Loader'
+import { useApp } from '../context/AppContext'
 import { collection, getDocs, doc, updateDoc, onSnapshot, serverTimestamp } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { db, storage } from '../firebase/config'
 
 const Transactions = () => {
+  const { showToast } = useApp()
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('pending')
   const [selectedWithdrawal, setSelectedWithdrawal] = useState(null)
   const [showModal, setShowModal] = useState(false)
+  const [showRejectConfirm, setShowRejectConfirm] = useState(false)
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -37,6 +40,7 @@ const Transactions = () => {
             hostName: data.hostName || data.userName || data.name || 'Unknown Host',
             hostId: data.hostId || data.userId || '',
             numericUserId: data.numericUserId || 'N/A',
+            coins: data.coins || data.coinsAmount || 0,
             amount: data.amount || 0,
             accountNumber: data.accountNumber || data.bankAccount || 'N/A',
             bankName: data.bankName || 'N/A',
@@ -77,12 +81,12 @@ const Transactions = () => {
     const file = e.target.files[0]
     if (file) {
       if (!file.type.startsWith('image/')) {
-        alert('Please select an image file')
+        showToast('Please select an image file', 'error')
         return
       }
       
       if (file.size > 5 * 1024 * 1024) {
-        alert('File size must be less than 5MB')
+        showToast('File size must be less than 5MB', 'error')
         return
       }
       
@@ -114,7 +118,6 @@ const Transactions = () => {
         
         await uploadBytes(storageRef, paymentScreenshot)
         proofUrl = await getDownloadURL(storageRef)
-        console.log('✅ Payment proof uploaded:', proofUrl)
         setUploading(false)
       }
 
@@ -130,14 +133,12 @@ const Transactions = () => {
         updatedAt: serverTimestamp()
       })
 
-      console.log('✅ Withdrawal marked as paid')
-      alert('✅ Payment approved successfully!')
+      showToast('Payment approved successfully!', 'success')
       setShowModal(false)
       setPaymentScreenshot(null)
       setScreenshotPreview(null)
     } catch (error) {
-      console.error('Error approving payment:', error)
-      alert('❌ Error approving payment: ' + error.message)
+      showToast(`Error approving payment: ${error.message}`, 'error')
     }
     setProcessing(false)
     setUploading(false)
@@ -145,9 +146,14 @@ const Transactions = () => {
 
   const handleRejectPayment = async () => {
     if (!selectedWithdrawal) return
-    if (!window.confirm('Are you sure you want to reject this withdrawal request?')) return
+    setShowRejectConfirm(true)
+  }
 
+  const confirmRejectPayment = async () => {
+    if (!selectedWithdrawal) return
+    
     setProcessing(true)
+    setShowRejectConfirm(false)
     try {
       const withdrawalRef = doc(db, 'payments', selectedWithdrawal.id)
       await updateDoc(withdrawalRef, {
@@ -157,11 +163,10 @@ const Transactions = () => {
         updatedAt: serverTimestamp()
       })
 
-      alert('❌ Withdrawal request rejected')
+      showToast('Withdrawal request rejected', 'error')
       setShowModal(false)
     } catch (error) {
-      console.error('Error rejecting payment:', error)
-      alert('❌ Error rejecting request')
+      showToast('Error rejecting request', 'error')
     }
     setProcessing(false)
   }
@@ -185,10 +190,13 @@ const Transactions = () => {
   }
 
   const filteredWithdrawals = withdrawals.filter(w => {
+    const searchLower = searchTerm.toLowerCase()
     const matchesSearch = 
-      w.hostName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      w.numericUserId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      w.accountNumber.toLowerCase().includes(searchTerm.toLowerCase())
+      w.hostName.toLowerCase().includes(searchLower) ||
+      w.numericUserId.toLowerCase().includes(searchLower) ||
+      w.accountNumber.toLowerCase().includes(searchLower) ||
+      (w.coins && w.coins.toString().includes(searchLower)) ||
+      (w.amount && w.amount.toString().includes(searchLower))
     
     if (filterStatus === 'all') return matchesSearch
     return matchesSearch && w.status === filterStatus
@@ -218,6 +226,21 @@ const Transactions = () => {
           <p className="text-xs text-primary-600 dark:text-primary-400 font-mono font-bold">
             ID: {row.numericUserId}
           </p>
+        </div>
+      )
+    },
+    {
+      header: 'Coins',
+      accessor: 'coins',
+      render: (row) => (
+        <div className="flex items-center gap-2">
+          <Coins className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+          <div>
+            <span className="font-bold text-primary-600 dark:text-primary-400">
+              {row.coins ? row.coins.toLocaleString() : 'N/A'}
+            </span>
+            <span className="text-xs text-gray-500 ml-1">coins</span>
+          </div>
         </div>
       )
     },
@@ -405,7 +428,11 @@ const Transactions = () => {
                 </span>
               </div>
               <div className="text-right">
-                <p className="text-xs text-gray-500 mb-1">Amount</p>
+                <p className="text-xs text-gray-500 mb-1">Coins</p>
+                <p className="text-lg font-bold text-primary-600 dark:text-primary-400">
+                  {selectedWithdrawal.coins ? selectedWithdrawal.coins.toLocaleString() : 'N/A'} coins
+                </p>
+                <p className="text-xs text-gray-500 mb-1 mt-2">Amount</p>
                 <p className="text-2xl font-bold text-green-600 dark:text-green-400">
                   ₹{selectedWithdrawal.amount.toLocaleString()}
                 </p>
@@ -433,6 +460,25 @@ const Transactions = () => {
                 <div>
                   <p className="text-gray-600 dark:text-gray-400">Payment Method</p>
                   <p className="font-medium">{selectedWithdrawal.paymentMethod}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Withdrawal Details */}
+            <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border border-purple-200 dark:border-purple-800">
+              <h4 className="font-semibold mb-3">Withdrawal Details</h4>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-gray-600 dark:text-gray-400">Coins Requested</p>
+                  <p className="font-bold text-lg text-primary-600 dark:text-primary-400">
+                    {selectedWithdrawal.coins ? selectedWithdrawal.coins.toLocaleString() : 'N/A'} coins
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-600 dark:text-gray-400">Withdrawal Amount</p>
+                  <p className="font-bold text-lg text-green-600 dark:text-green-400">
+                    ₹{selectedWithdrawal.amount.toLocaleString()}
+                  </p>
                 </div>
               </div>
             </div>
@@ -559,6 +605,34 @@ const Transactions = () => {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Reject Confirmation Modal */}
+      <Modal
+        isOpen={showRejectConfirm}
+        onClose={() => setShowRejectConfirm(false)}
+        title="Confirm Rejection"
+      >
+        <div className="space-y-4">
+          <p className="text-gray-600 dark:text-gray-400">
+            Are you sure you want to reject this withdrawal request? This action cannot be undone.
+          </p>
+          <div className="flex gap-3 pt-4">
+            <button
+              onClick={() => setShowRejectConfirm(false)}
+              className="flex-1 px-4 py-2.5 border-2 border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors font-semibold"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmRejectPayment}
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-lg font-semibold transition-colors disabled:opacity-50"
+              disabled={processing}
+            >
+              {processing ? 'Rejecting...' : 'Confirm Reject'}
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   )

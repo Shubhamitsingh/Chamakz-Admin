@@ -16,6 +16,8 @@ const Events = () => {
   const [modalMode, setModalMode] = useState('add')
   const [selectedItem, setSelectedItem] = useState(null)
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' })
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [itemToDelete, setItemToDelete] = useState(null)
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState(null)
@@ -198,17 +200,23 @@ const Events = () => {
     setShowModal(true)
   }
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this item?')) return
+  const handleDelete = (id) => {
+    setItemToDelete(id)
+    setShowDeleteConfirm(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!itemToDelete) return
 
     setProcessing(true)
+    setShowDeleteConfirm(false)
     try {
       const collectionName = activeTab === 'announcements' ? 'announcements' : 'events'
-      await deleteDoc(doc(db, collectionName, id))
-      showToast(`${activeTab === 'announcements' ? 'Announcement' : 'Event'} deleted successfully`, 'success')
+      await deleteDoc(doc(db, collectionName, itemToDelete))
+      setToast({ show: true, message: `${activeTab === 'announcements' ? 'Announcement' : 'Event'} deleted successfully`, type: 'success' })
+      setItemToDelete(null)
     } catch (error) {
-      console.error('Error deleting:', error)
-      showToast('Error deleting item', 'error')
+      setToast({ show: true, message: 'Error deleting item', type: 'error' })
     }
     setProcessing(false)
   }
@@ -830,6 +838,40 @@ const Events = () => {
 
       {/* Toast Notification */}
       {toast.show && <Toast message={toast.message} type={toast.type} />}
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false)
+          setItemToDelete(null)
+        }}
+        title="Confirm Delete"
+      >
+        <div className="space-y-4">
+          <p className="text-gray-600 dark:text-gray-400">
+            Are you sure you want to delete this {activeTab === 'announcements' ? 'announcement' : 'event'}? This action cannot be undone.
+          </p>
+          <div className="flex gap-3 pt-4">
+            <button
+              onClick={() => {
+                setShowDeleteConfirm(false)
+                setItemToDelete(null)
+              }}
+              className="flex-1 px-4 py-2.5 border-2 border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors font-semibold"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmDelete}
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-lg font-semibold transition-colors disabled:opacity-50"
+              disabled={processing}
+            >
+              {processing ? 'Deleting...' : 'Confirm Delete'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

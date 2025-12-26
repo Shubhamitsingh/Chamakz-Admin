@@ -15,6 +15,8 @@ const Feedback = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedFeedback, setSelectedFeedback] = useState(null)
   const [showFeedbackModal, setShowFeedbackModal] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [feedbackToDelete, setFeedbackToDelete] = useState(null)
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
   const [feedback, setFeedback] = useState([])
@@ -264,14 +266,18 @@ const Feedback = () => {
     setProcessing(false)
   }
 
-  const handleDeleteFeedback = async (feedbackId) => {
-    if (!window.confirm('Are you sure you want to delete this feedback? This action cannot be undone.')) {
-      return
-    }
+  const handleDeleteFeedback = (feedbackId) => {
+    setFeedbackToDelete(feedbackId)
+    setShowDeleteConfirm(true)
+  }
+
+  const confirmDeleteFeedback = async () => {
+    if (!feedbackToDelete) return
 
     setProcessing(true)
+    setShowDeleteConfirm(false)
     try {
-      const feedbackItem = feedback.find(f => f.id === feedbackId)
+      const feedbackItem = feedback.find(f => f.id === feedbackToDelete)
       if (!feedbackItem) {
         throw new Error('Feedback not found')
       }
@@ -282,11 +288,11 @@ const Feedback = () => {
       await deleteDoc(feedbackRef)
       
       // Update local state
-      setFeedback(prev => prev.filter(f => f.id !== feedbackId))
+      setFeedback(prev => prev.filter(f => f.id !== feedbackToDelete))
       setShowFeedbackModal(false)
-      showToast('Feedback deleted successfully')
+      showToast('Feedback deleted successfully', 'success')
+      setFeedbackToDelete(null)
     } catch (error) {
-      console.error('Error deleting feedback:', error)
       showToast('Error deleting feedback', 'error')
     }
     setProcessing(false)
@@ -653,6 +659,40 @@ const Feedback = () => {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false)
+          setFeedbackToDelete(null)
+        }}
+        title="Confirm Delete"
+      >
+        <div className="space-y-4">
+          <p className="text-gray-600 dark:text-gray-400">
+            Are you sure you want to delete this feedback? This action cannot be undone.
+          </p>
+          <div className="flex gap-3 pt-4">
+            <button
+              onClick={() => {
+                setShowDeleteConfirm(false)
+                setFeedbackToDelete(null)
+              }}
+              className="flex-1 px-4 py-2.5 border-2 border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors font-semibold"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmDeleteFeedback}
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-lg font-semibold transition-colors disabled:opacity-50"
+              disabled={processing}
+            >
+              {processing ? 'Deleting...' : 'Confirm Delete'}
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   )

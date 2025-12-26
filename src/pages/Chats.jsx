@@ -7,7 +7,7 @@ import { collection, query, orderBy, limit, onSnapshot, addDoc, serverTimestamp,
 import { db } from '../firebase/config'
 
 const Chats = () => {
-  const { user: adminUser } = useApp()
+  const { user: adminUser, showToast } = useApp()
   const [chats, setChats] = useState([])
   const [selectedChat, setSelectedChat] = useState(null)
   const [messages, setMessages] = useState([])
@@ -19,13 +19,10 @@ const Chats = () => {
 
   // Fetch support chats from Firebase
   useEffect(() => {
-    console.log('💬 Loading support chats from Firebase...')
-    
     // Set up listener for supportChats collection
     const unsubscribe = onSnapshot(
       collection(db, 'supportChats'),
       (snapshot) => {
-        console.log(`✅ Found ${snapshot.size} support chats`)
         
         const chatsData = snapshot.docs.map(doc => {
           const data = doc.data()
@@ -75,7 +72,6 @@ const Chats = () => {
       return
     }
 
-    console.log('📨 Loading messages for chat:', selectedChat.id)
 
     // Try subcollection first: supportChats/{chatId}/messages
     const tryMessageCollections = async () => {
@@ -107,7 +103,6 @@ const Chats = () => {
         
         return () => unsubscribe()
       } catch (error) {
-        console.log('Could not load messages:', error)
         setMessages([])
       }
     }
@@ -147,12 +142,11 @@ const Chats = () => {
         unreadByUser: true
       })
 
-      console.log('✅ Message sent successfully')
       setMessage('')
       scrollToBottom()
     } catch (error) {
       console.error('Error sending message:', error)
-      alert('❌ Error sending message. Please try again.')
+      showToast('Error sending message. Please try again.', 'error')
     }
     setSending(false)
   }

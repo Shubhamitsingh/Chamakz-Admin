@@ -76,12 +76,15 @@ const Users = () => {
                     }
                   }
                   
+                  // Determine role: if user has liveApprovalCode, they are a Host
+                  const userRole = data.role || (data.liveApprovalCode ? 'Host' : 'User')
+                  
                   usersData.push({
                     id: docSnapshot.id,
                     numericUserId: data.numericUserId || 'N/A',
                     name: data.name || data.displayName || data.userName || 'Unknown User',
                     email: data.email || 'No email',
-                    role: data.role || 'User',
+                    role: userRole,
                     status: data.blocked ? 'Blocked' : 'Active',
                     coins: Number(data.coins) || 0,
                     joinDate: joinDate,
@@ -164,6 +167,8 @@ const Users = () => {
       }
     }
   }
+
+
 
   // Filter users
   const filteredUsers = users.filter(user => {
@@ -278,7 +283,20 @@ const Users = () => {
     { 
       header: 'Role', 
       accessor: 'role',
-      render: (row) => row?.role || 'User'
+      render: (row) => {
+        const role = row?.role || 'User'
+        const isHost = role === 'Host'
+        return (
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+            isHost 
+              ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' 
+              : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
+          }`}>
+            {isHost && '🎥 '}
+            {role}
+          </span>
+        )
+      }
     },
     {
       header: 'Status',
@@ -469,6 +487,7 @@ const Users = () => {
           </div>
         </Modal>
       )}
+
     </div>
   )
 }

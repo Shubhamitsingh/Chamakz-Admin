@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AppProvider } from './context/AppContext'
 import MainLayout from './layouts/MainLayout'
 import ProtectedRoute from './components/ProtectedRoute'
+import ErrorBoundary from './components/ErrorBoundary'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Users from './pages/Users'
@@ -11,27 +12,29 @@ import TicketsV2 from './pages/TicketsV2'
 import Chats from './pages/Chats'
 import Feedback from './pages/Feedback'
 import Approvals from './pages/Approvals'
+import AccountApproval from './pages/AccountApproval'
 import CoinReseller from './pages/CoinReseller'
 import Events from './pages/Events'
 import Settings from './pages/Settings'
 
 function App() {
   return (
-    <AppProvider>
-      <Router>
-        <Routes>
-          {/* Public Route */}
-          <Route path="/login" element={<Login />} />
-          
-          {/* Protected Routes */}
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <MainLayout />
-              </ProtectedRoute>
-            }
-          >
+    <ErrorBoundary>
+      <AppProvider>
+        <Router>
+          <Routes>
+            {/* Public Route */}
+            <Route path="/login" element={<Login />} />
+            
+            {/* Protected Routes */}
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <MainLayout />
+                </ProtectedRoute>
+              }
+            >
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="users" element={<Users />} />
@@ -41,13 +44,15 @@ function App() {
             <Route path="chats" element={<Chats />} />
             <Route path="feedback" element={<Feedback />} />
             <Route path="approvals" element={<Approvals />} />
+            <Route path="account-approval" element={<AccountApproval />} />
             <Route path="coinreseller" element={<CoinReseller />} />
             <Route path="events" element={<Events />} />
             <Route path="settings" element={<Settings />} />
-          </Route>
-        </Routes>
-      </Router>
-    </AppProvider>
+            </Route>
+          </Routes>
+        </Router>
+      </AppProvider>
+    </ErrorBoundary>
   )
 }
 

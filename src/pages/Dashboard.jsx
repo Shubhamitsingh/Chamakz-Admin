@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Users, Coins, Ticket, MessageSquare, UserCheck } from 'lucide-react'
+import { Users, Coins, Ticket, MessageSquare, Key } from 'lucide-react'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { useApp } from '../context/AppContext'
 import StatCard from '../components/StatCard'
 import Loader from '../components/Loader'
-import { collection, getDocs, query, where, orderBy, limit, Timestamp } from 'firebase/firestore'
+import { collection, getDocs, query, where, orderBy, limit, Timestamp, onSnapshot } from 'firebase/firestore'
 import { db } from '../firebase/config'
 
 const Dashboard = () => {
@@ -16,7 +16,7 @@ const Dashboard = () => {
     totalCoins: 0,
     activeTickets: 0,
     ongoingChats: 0,
-    pendingApprovals: 0
+    approvedHosts: 0
   })
   const [recentActivity, setRecentActivity] = useState([])
   const [chartData, setChartData] = useState({
@@ -42,7 +42,7 @@ const Dashboard = () => {
             totalCoins += doc.data().balance || 0
           })
         } catch (error) {
-          console.log('Wallets collection may not exist yet')
+          // Wallets collection may not exist yet
         }
 
         // Fetch active tickets count
@@ -83,19 +83,6 @@ const Dashboard = () => {
           } catch (fallbackError) {
             console.log('Chats collection may not exist yet')
           }
-        }
-
-        // Fetch pending approvals count
-        let pendingApprovals = 0
-        try {
-          const approvalsQuery = query(
-            collection(db, 'coinResellerApprovals'),
-            where('status', '==', 'pending')
-          )
-          const approvalsSnapshot = await getDocs(approvalsQuery)
-          pendingApprovals = approvalsSnapshot.size
-        } catch (error) {
-          console.log('Approvals collection may not exist yet')
         }
 
         // Fetch user activity data for last 7 days
@@ -219,13 +206,13 @@ const Dashboard = () => {
           }
         })
 
-        setStats({
+        setStats(prevStats => ({
           totalUsers,
           totalCoins,
           activeTickets,
           ongoingChats,
-          pendingApprovals
-        })
+          approvedHosts: prevStats.approvedHosts // Keep existing value, will be updated by real-time listener
+        }))
         setRecentActivity(activities)
         setChartData({
           userActivity: userActivityData.length > 0 ? userActivityData : [
@@ -255,6 +242,56 @@ const Dashboard = () => {
     }
 
     fetchDashboardData()
+  }, [])
+
+  // Real-time listener for approved hosts count
+  useEffect(() => {
+    let unsubscribe = null
+    let isMounted = true
+    
+    try {
+      const usersCollection = collection(db, 'users')
+      
+      unsubscribe = onSnapshot(
+        usersCollection,
+        (snapshot) => {
+          if (!isMounted) return
+          
+          let approvedCount = 0
+          
+          snapshot.forEach(doc => {
+            const userData = doc.data()
+            // Count users who have approval code assigned (approved by admin)
+            if (userData.liveApprovalCode) {
+              approvedCount++
+            }
+          })
+          
+          setStats(prevStats => ({
+            ...prevStats,
+            approvedHosts: approvedCount
+          }))
+        },
+        (error) => {
+          console.error('Error listening to approved hosts count:', error)
+          if (isMounted) {
+            setStats(prevStats => ({
+              ...prevStats,
+              approvedHosts: 0
+            }))
+          }
+        }
+      )
+    } catch (error) {
+      console.error('Error setting up approved hosts listener:', error)
+    }
+
+    return () => {
+      isMounted = false
+      if (unsubscribe) {
+        unsubscribe()
+      }
+    }
   }, [])
 
   const statCards = [
@@ -287,11 +324,11 @@ const Dashboard = () => {
       trend: { positive: true, value: `${stats.ongoingChats}`, label: 'active chats' },
     },
     {
-      title: 'Pending Approvals',
-      value: stats.pendingApprovals,
-      icon: UserCheck,
-      color: 'pink',
-      trend: { positive: false, value: `${stats.pendingApprovals}`, label: 'awaiting review' },
+      title: 'Approved Hosts',
+      value: stats.approvedHosts,
+      icon: Key,
+      color: 'purple',
+      trend: { positive: true, value: `${stats.approvedHosts}`, label: 'approved hosts' },
     },
   ]
 

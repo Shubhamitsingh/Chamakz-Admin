@@ -7,7 +7,6 @@ import {
   Wallet,
   Ticket,
   MessageSquare,
-  UserCheck,
   Calendar,
   DollarSign,
   Settings,
@@ -15,16 +14,12 @@ import {
   ChevronLeft,
   MessageCircle,
   Coins,
+  Key,
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 
 const Sidebar = () => {
   const { sidebarOpen, toggleSidebar, logout, openTicketsCount, newUsersCount, unreadChatsCount } = useApp()
-  
-  // Debug: Log unread chat count (remove in production)
-  useEffect(() => {
-    console.log('🔴 Sidebar - unreadChatsCount:', unreadChatsCount, 'type:', typeof unreadChatsCount, 'badge will show:', Number(unreadChatsCount) > 0)
-  }, [unreadChatsCount])
 
   const menuItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -34,7 +29,7 @@ const Sidebar = () => {
     { path: '/tickets', icon: Ticket, label: 'Tickets / Support', badge: openTicketsCount },
     { path: '/chats', icon: MessageSquare, label: 'Chats', badge: unreadChatsCount },
     { path: '/feedback', icon: MessageCircle, label: 'Feedback' },
-    { path: '/approvals', icon: UserCheck, label: 'Account Approvals' },
+    { path: '/account-approval', icon: Key, label: 'Approve Account' },
     { path: '/coinreseller', icon: Coins, label: 'CoinReseller' },
     { path: '/events', icon: Calendar, label: 'Events' },
     { path: '/settings', icon: Settings, label: 'Settings' },

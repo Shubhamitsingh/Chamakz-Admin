@@ -11,7 +11,8 @@ import {
   orderBy,
   limit,
   startAfter,
-  onSnapshot
+  onSnapshot,
+  serverTimestamp
 } from 'firebase/firestore'
 import { db } from './config'
 
@@ -155,6 +156,117 @@ export const toggleUserBlock = async (userId, blocked) => {
     return { success: true }
   } catch (error) {
     console.error('Error blocking/unblocking user:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+/**
+ * Generate unique approval code (6-8 digits)
+ * @returns {string} Unique approval code
+ */
+const generateApprovalCode = () => {
+  // Generate 6-digit code (100000 to 999999)
+  const min = 100000
+  const max = 999999
+  return Math.floor(Math.random() * (max - min + 1) + min).toString()
+}
+
+/**
+ * Approve user for live streaming with unique code
+ * @param {string} userId - User ID
+ * @param {string} approvalCode - Approval code (optional, will generate if not provided)
+ * @returns {Promise} Success status with approval code
+ */
+export const approveUserForLive = async (userId, approvalCode = null) => {
+  try {
+    const docRef = doc(db, USERS_COLLECTION, userId)
+    
+    // Generate code if not provided
+    const code = approvalCode || generateApprovalCode()
+    
+    // Check if code already exists for another user
+    // Note: For production, you might want to add a check here
+    // For now, we'll just use the provided/generated code
+    
+    const updates = {
+      liveApprovalCode: code,
+      // User still needs to enter code in app, so isLiveApproved stays false initially
+      isLiveApproved: false,
+      role: 'Host', // Set role to Host when approved by admin
+      liveApprovalDate: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    }
+    
+    await updateDoc(docRef, updates)
+    return { success: true, approvalCode: code }
+  } catch (error) {
+    console.error('Error approving user for live:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+/**
+ * Verify and activate live approval code (called from Flutter app)
+ * @param {string} userId - User ID
+ * @param {string} enteredCode - Code entered by user
+ * @returns {Promise} Success status
+ */
+export const verifyLiveApprovalCode = async (userId, enteredCode) => {
+  try {
+    const docRef = doc(db, USERS_COLLECTION, userId)
+    const userDoc = await getDoc(docRef)
+    
+    if (!userDoc.exists()) {
+      return { success: false, error: 'User not found' }
+    }
+    
+    const userData = userDoc.data()
+    const storedCode = userData.liveApprovalCode
+    
+    if (!storedCode) {
+      return { success: false, error: 'No approval code found. Please contact admin.' }
+    }
+    
+    if (storedCode.toString() !== enteredCode.toString()) {
+      return { success: false, error: 'Invalid approval code. Please try again.' }
+    }
+    
+    // Code matches - activate live access
+    await updateDoc(docRef, {
+      isLiveApproved: true,
+      liveCodeActivatedAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    })
+    
+    return { success: true }
+  } catch (error) {
+    console.error('Error verifying approval code:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+/**
+ * Toggle live streaming approval for user (direct toggle - for admin panel)
+ * @param {string} userId - User ID
+ * @param {boolean} approved - Approval status
+ * @returns {Promise} Success status
+ */
+export const toggleLiveApproval = async (userId, approved) => {
+  try {
+    const docRef = doc(db, USERS_COLLECTION, userId)
+    const updates = {
+      isLiveApproved: approved,
+      updatedAt: serverTimestamp()
+    }
+    
+    if (approved) {
+      updates.liveApprovalDate = serverTimestamp()
+    }
+    
+    await updateDoc(docRef, updates)
+    return { success: true }
+  } catch (error) {
+    console.error('Error toggling live approval:', error)
     return { success: false, error: error.message }
   }
 }

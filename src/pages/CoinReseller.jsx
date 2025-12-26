@@ -23,6 +23,10 @@ const CoinReseller = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('All')
   const [selectedReseller, setSelectedReseller] = useState(null)
+  const [showRejectConfirm, setShowRejectConfirm] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [resellerToReject, setResellerToReject] = useState(null)
+  const [resellerToDelete, setResellerToDelete] = useState(null)
   const [showResellerModal, setShowResellerModal] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
   const [resellers, setResellers] = useState([])
@@ -193,41 +197,51 @@ const CoinReseller = () => {
     setProcessing(false)
   }
 
-  const handleReject = async (approvalId) => {
-    if (!window.confirm('Are you sure you want to reject this coin reseller application?')) {
-      return
-    }
+  const handleReject = (approvalId) => {
+    setResellerToReject(approvalId)
+    setShowRejectConfirm(true)
+  }
+
+  const confirmReject = async () => {
+    if (!resellerToReject) return
 
     setProcessing(true)
+    setShowRejectConfirm(false)
     try {
-      const result = await rejectCoinReseller(approvalId)
+      const result = await rejectCoinReseller(resellerToReject)
       if (result.success) {
         showToast('Coin reseller rejected', 'success')
+        setResellerToReject(null)
       } else {
         showToast(result.error || 'Error rejecting coin reseller', 'error')
       }
     } catch (error) {
-      console.error('Error rejecting coin reseller:', error)
       showToast('Error rejecting coin reseller', 'error')
     }
     setProcessing(false)
   }
 
-  const handleDeleteReseller = async (resellerId, numericUserId, resellerName) => {
-    if (!window.confirm(`Are you sure you want to delete "${resellerName}"? This action cannot be undone and will remove the reseller from all collections.`)) {
-      return
-    }
+  const handleDeleteReseller = (resellerId, numericUserId, resellerName) => {
+    setResellerToDelete({ id: resellerId, numericUserId, name: resellerName })
+    setShowDeleteConfirm(true)
+  }
+
+  const confirmDeleteReseller = async () => {
+    if (!resellerToDelete) return
 
     setProcessing(true)
+    setShowDeleteConfirm(false)
+    const { id, numericUserId, name } = resellerToDelete
+
     try {
-      const result = await deleteCoinReseller(resellerId, numericUserId)
+      const result = await deleteCoinReseller(id, numericUserId)
       if (result.success) {
         showToast('Coin reseller deleted successfully', 'success')
+        setResellerToDelete(null)
       } else {
         showToast(result.error || 'Error deleting coin reseller', 'error')
       }
     } catch (error) {
-      console.error('Error deleting coin reseller:', error)
       showToast('Error deleting coin reseller', 'error')
     }
     setProcessing(false)
@@ -772,6 +786,74 @@ const CoinReseller = () => {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Reject Confirmation Modal */}
+      <Modal
+        isOpen={showRejectConfirm}
+        onClose={() => {
+          setShowRejectConfirm(false)
+          setResellerToReject(null)
+        }}
+        title="Confirm Rejection"
+      >
+        <div className="space-y-4">
+          <p className="text-gray-600 dark:text-gray-400">
+            Are you sure you want to reject this coin reseller application? This action cannot be undone.
+          </p>
+          <div className="flex gap-3 pt-4">
+            <button
+              onClick={() => {
+                setShowRejectConfirm(false)
+                setResellerToReject(null)
+              }}
+              className="flex-1 px-4 py-2.5 border-2 border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors font-semibold"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmReject}
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-lg font-semibold transition-colors disabled:opacity-50"
+              disabled={processing}
+            >
+              {processing ? 'Rejecting...' : 'Confirm Reject'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false)
+          setResellerToDelete(null)
+        }}
+        title="Confirm Delete"
+      >
+        <div className="space-y-4">
+          <p className="text-gray-600 dark:text-gray-400">
+            Are you sure you want to delete "{resellerToDelete?.name}"? This action cannot be undone and will remove the reseller from all collections.
+          </p>
+          <div className="flex gap-3 pt-4">
+            <button
+              onClick={() => {
+                setShowDeleteConfirm(false)
+                setResellerToDelete(null)
+              }}
+              className="flex-1 px-4 py-2.5 border-2 border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors font-semibold"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmDeleteReseller}
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-lg font-semibold transition-colors disabled:opacity-50"
+              disabled={processing}
+            >
+              {processing ? 'Deleting...' : 'Confirm Delete'}
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   )
