@@ -4,7 +4,6 @@ import { motion } from 'framer-motion'
 import {
   LayoutDashboard,
   Users,
-  Wallet,
   Ticket,
   MessageSquare,
   Calendar,
@@ -13,8 +12,6 @@ import {
   LogOut,
   ChevronLeft,
   MessageCircle,
-  Coins,
-  Key,
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 
@@ -24,13 +21,10 @@ const Sidebar = () => {
   const menuItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/users', icon: Users, label: 'Users', badge: newUsersCount },
-    { path: '/wallet', icon: Wallet, label: 'Wallet / Coins' },
     { path: '/transactions', icon: DollarSign, label: 'Payment' },
     { path: '/tickets', icon: Ticket, label: 'Tickets / Support', badge: openTicketsCount },
     { path: '/chats', icon: MessageSquare, label: 'Chats', badge: unreadChatsCount },
     { path: '/feedback', icon: MessageCircle, label: 'Feedback' },
-    { path: '/account-approval', icon: Key, label: 'Approve Account' },
-    { path: '/coinreseller', icon: Coins, label: 'CoinReseller' },
     { path: '/events', icon: Calendar, label: 'Events' },
     { path: '/settings', icon: Settings, label: 'Settings' },
   ]

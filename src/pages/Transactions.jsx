@@ -13,7 +13,7 @@ import { db, storage } from '../firebase/config'
 const Transactions = () => {
   const { showToast } = useApp()
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterStatus, setFilterStatus] = useState('pending')
+  const [filterStatus, setFilterStatus] = useState('all')
   const [selectedWithdrawal, setSelectedWithdrawal] = useState(null)
   const [showModal, setShowModal] = useState(false)
   const [showRejectConfirm, setShowRejectConfirm] = useState(false)
@@ -26,56 +26,111 @@ const Transactions = () => {
 
   // Fetch withdrawal requests from Firebase
   useEffect(() => {
-    console.log('💰 Loading withdrawal requests...')
+    console.log('💰 [Transactions] Starting to load withdrawal requests from Firebase...')
+    console.log('💰 [Transactions] Collection: withdrawal_requests')
     
     const unsubscribe = onSnapshot(
-      collection(db, 'payments'),
+      collection(db, 'withdrawal_requests'),
       (snapshot) => {
-        console.log(`✅ Found ${snapshot.size} withdrawal requests`)
+        console.log(`✅ [Transactions] Firebase snapshot received: ${snapshot.size} documents`)
         
-        const withdrawalsData = snapshot.docs.map(doc => {
+        if (snapshot.empty) {
+          console.warn('⚠️ [Transactions] Collection is EMPTY - No withdrawal requests found!')
+          console.warn('⚠️ [Transactions] Check if:')
+          console.warn('   1. Collection name is correct: "withdrawal_requests"')
+          console.warn('   2. Documents exist in Firebase Console')
+          console.warn('   3. Firebase rules allow read access')
+          setWithdrawals([])
+          setLoading(false)
+          return
+        }
+        
+        // Log first document structure for debugging
+        if (snapshot.docs.length > 0) {
+          const firstDoc = snapshot.docs[0]
+          const firstData = firstDoc.data()
+          console.log('📄 [Transactions] Sample document structure:', {
+            id: firstDoc.id,
+            fields: Object.keys(firstData),
+            sampleData: firstData
+          })
+        }
+        
+        const withdrawalsData = snapshot.docs.map((doc, index) => {
           const data = doc.data()
-          return {
+          const createdAt = data.createdAt || data.created_at || data.timestamp || data.requestDate
+          const createdAtDate = createdAt 
+            ? (createdAt.toDate ? createdAt.toDate() : (createdAt instanceof Date ? createdAt : new Date(createdAt)))
+            : null
+          
+          const mappedData = {
             id: doc.id,
-            hostName: data.hostName || data.userName || data.name || 'Unknown Host',
-            hostId: data.hostId || data.userId || '',
-            numericUserId: data.numericUserId || 'N/A',
-            coins: data.coins || data.coinsAmount || 0,
-            amount: data.amount || 0,
-            accountNumber: data.accountNumber || data.bankAccount || 'N/A',
-            bankName: data.bankName || 'N/A',
-            accountHolder: data.accountHolder || data.accountHolderName || data.hostName || 'N/A',
-            ifscCode: data.ifscCode || data.ifsc || 'N/A',
-            upiId: data.upiId || data.upi || 'N/A',
-            paymentMethod: data.paymentMethod || 'Bank Transfer',
-            status: (data.status || 'pending').toLowerCase(),
-            requestDate: data.createdAt ? new Date(data.createdAt.toDate()).toLocaleDateString() : 'N/A',
-            requestTime: data.createdAt ? new Date(data.createdAt.toDate()).toLocaleString() : 'N/A',
-            paymentProof: data.paymentProof || data.paymentScreenshot || '',
-            approvedBy: data.approvedBy || '',
-            approvedAt: data.approvedAt ? new Date(data.approvedAt.toDate()).toLocaleString() : '',
+            hostName: data.hostName || data.userName || data.name || data.host_name || 'Unknown Host',
+            hostId: data.hostId || data.userId || data.user_id || '',
+            numericUserId: data.numericUserId || data.numeric_user_id || data.userId || data.user_id || 'N/A',
+            coins: data.coins || data.coinsAmount || data.coins_amount || data.amount || 0,
+            amount: data.amount || data.withdrawalAmount || data.withdrawal_amount || data.requestedAmount || 0,
+            accountNumber: data.accountNumber || data.bankAccount || data.bank_account || data.account_number || 'N/A',
+            bankName: data.bankName || data.bank_name || 'N/A',
+            accountHolder: data.accountHolder || data.accountHolderName || data.account_holder || data.account_holder_name || data.hostName || data.userName || 'N/A',
+            ifscCode: data.ifscCode || data.ifsc || data.ifsc_code || 'N/A',
+            upiId: data.upiId || data.upi || data.upi_id || 'N/A',
+            paymentMethod: data.paymentMethod || data.payment_method || data.method || 'Bank Transfer',
+            status: (data.status || 'pending').toLowerCase().trim(),
+            requestDate: createdAtDate ? createdAtDate.toLocaleDateString() : 'N/A',
+            requestTime: createdAtDate ? createdAtDate.toLocaleString() : 'N/A',
+            paymentProof: data.paymentProof || data.paymentScreenshot || data.payment_proof || data.payment_screenshot || '',
+            approvedBy: data.approvedBy || data.approved_by || '',
+            approvedAt: data.approvedAt 
+              ? (data.approvedAt.toDate ? new Date(data.approvedAt.toDate()).toLocaleString() : new Date(data.approvedAt).toLocaleString())
+              : '',
+            createdAt: createdAtDate,
             ...data
           }
+          
+          // Log each mapped document for debugging
+          if (index === 0) {
+            console.log('🔍 [Transactions] First mapped document:', mappedData)
+          }
+          
+          return mappedData
         }).sort((a, b) => {
           const dateA = a.createdAt
           const dateB = b.createdAt
           if (!dateA) return 1
           if (!dateB) return -1
-          return dateB.toDate() - dateA.toDate()
+          return dateB.getTime() - dateA.getTime()
+        })
+        
+        console.log(`✅ [Transactions] Successfully mapped ${withdrawalsData.length} withdrawal requests`)
+        console.log(`📊 [Transactions] Status breakdown:`, {
+          all: withdrawalsData.length,
+          pending: withdrawalsData.filter(w => w.status === 'pending').length,
+          paid: withdrawalsData.filter(w => ['paid', 'approved', 'completed'].includes(w.status)).length,
+          rejected: withdrawalsData.filter(w => w.status === 'rejected').length,
+          other: withdrawalsData.filter(w => !['pending', 'paid', 'approved', 'completed', 'rejected'].includes(w.status)).length
         })
         
         setWithdrawals(withdrawalsData)
         setLoading(false)
       },
       (error) => {
-        console.error('Error loading withdrawals:', error)
+        console.error('❌ [Transactions] ERROR loading withdrawals:', error)
+        console.error('❌ [Transactions] Error code:', error.code)
+        console.error('❌ [Transactions] Error message:', error.message)
+        console.error('❌ [Transactions] Full error:', error)
+        
+        showToast(`Error loading withdrawal requests: ${error.message}`, 'error')
         setWithdrawals([])
         setLoading(false)
       }
     )
 
-    return () => unsubscribe()
-  }, [])
+    return () => {
+      console.log('🔄 [Transactions] Unsubscribing from withdrawal_requests collection')
+      unsubscribe()
+    }
+  }, [showToast])
 
   const handleScreenshotChange = (e) => {
     const file = e.target.files[0]
@@ -122,7 +177,7 @@ const Transactions = () => {
       }
 
       // Update withdrawal request status
-      const withdrawalRef = doc(db, 'payments', selectedWithdrawal.id)
+      const withdrawalRef = doc(db, 'withdrawal_requests', selectedWithdrawal.id)
       await updateDoc(withdrawalRef, {
         status: 'paid',
         paymentProof: proofUrl,
@@ -155,7 +210,7 @@ const Transactions = () => {
     setProcessing(true)
     setShowRejectConfirm(false)
     try {
-      const withdrawalRef = doc(db, 'payments', selectedWithdrawal.id)
+      const withdrawalRef = doc(db, 'withdrawal_requests', selectedWithdrawal.id)
       await updateDoc(withdrawalRef, {
         status: 'rejected',
         rejectedBy: 'admin',
@@ -396,11 +451,35 @@ const Transactions = () => {
         {filteredWithdrawals.length === 0 ? (
           <div className="text-center py-12">
             <DollarSign className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-            <p className="text-gray-600 dark:text-gray-400">
+            <p className="text-gray-600 dark:text-gray-400 mb-2">
               {withdrawals.length === 0 
                 ? 'No withdrawal requests yet. Requests will appear here when hosts request withdrawals.' 
                 : 'No requests match your filter.'}
             </p>
+            {withdrawals.length > 0 && (
+              <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-left max-w-md mx-auto">
+                <p className="text-sm font-semibold mb-2">💡 Debug Info:</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                  Total requests: {withdrawals.length}<br/>
+                  Filter: {filterStatus}<br/>
+                  Search term: {searchTerm || '(empty)'}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
+                  Try changing the filter or clearing the search.
+                </p>
+              </div>
+            )}
+            {withdrawals.length === 0 && (
+              <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg text-left max-w-md mx-auto">
+                <p className="text-sm font-semibold mb-2">🔍 Troubleshooting:</p>
+                <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1 list-disc list-inside">
+                  <li>Check Firebase Console for "withdrawal_requests" collection</li>
+                  <li>Verify documents exist in the collection</li>
+                  <li>Check browser console for detailed logs</li>
+                  <li>Verify Firebase rules allow read access</li>
+                </ul>
+              </div>
+            )}
           </div>
         ) : (
           <Table columns={columns} data={filteredWithdrawals} />

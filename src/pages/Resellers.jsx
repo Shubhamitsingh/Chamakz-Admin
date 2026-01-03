@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { Send, Search, Coins, AlertCircle, MessageCircle } from 'lucide-react'
+import { Send, Search, AlertCircle, MessageCircle } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import Loader from '../components/Loader'
 import Modal from '../components/Modal'
@@ -16,10 +16,6 @@ const Resellers = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
-  const [showAddCoinsModal, setShowAddCoinsModal] = useState(false)
-  const [coinAmount, setCoinAmount] = useState('')
-  const [coinReason, setCoinReason] = useState('Purchase')
-  const [addingCoins, setAddingCoins] = useState(false)
   const messagesEndRef = useRef(null)
 
   // Fetch reseller chats from Firebase
@@ -162,136 +158,6 @@ const Resellers = () => {
     setSending(false)
   }
 
-  const handleAddCoins = async () => {
-    if (!selectedChat || !coinAmount || !coinReason) {
-      showToast('Please fill all fields', 'error')
-      return
-    }
-
-    const amountNum = parseInt(coinAmount)
-    if (isNaN(amountNum) || amountNum <= 0) {
-      showToast('Please enter a valid amount', 'error')
-      return
-    }
-
-    setAddingCoins(true)
-    try {
-      const userRef = doc(db, 'users', selectedChat.userId)
-      
-      // Get current user data
-      const userSnap = await getDoc(userRef)
-      if (!userSnap.exists()) {
-        showToast('User not found', 'error')
-        setAddingCoins(false)
-        return
-      }
-
-      const currentUserData = userSnap.data()
-      const currentCoins = currentUserData?.coins || 0
-      
-      // Calculate new coin balance (Credit only for reseller purchases)
-      const newCoins = currentCoins + amountNum
-      
-      // Update user's coins in users collection
-      await updateDoc(userRef, {
-        coins: newCoins,
-        updatedAt: serverTimestamp()
-      })
-      
-      console.log(`✅ Updated user ${selectedChat.userId}: ${currentCoins} → ${newCoins} coins`)
-
-      // Update/create wallets collection
-      try {
-        const walletsRef = collection(db, 'wallets')
-        const walletQuery = query(walletsRef, where('userId', '==', selectedChat.userId))
-        const walletSnapshot = await getDocs(walletQuery)
-        
-        if (!walletSnapshot.empty) {
-          // Update existing wallet
-          const walletDoc = walletSnapshot.docs[0]
-          await updateDoc(doc(db, 'wallets', walletDoc.id), {
-            balance: newCoins,
-            coins: newCoins,
-            updatedAt: serverTimestamp()
-          })
-          console.log(`✅ Updated wallet for user ${selectedChat.userId}: ${newCoins} coins`)
-        } else {
-          // Create new wallet document
-          await addDoc(walletsRef, {
-            userId: selectedChat.userId,
-            numericUserId: selectedChat.numericUserId || 'N/A',
-            userName: selectedChat.username,
-            userEmail: selectedChat.userEmail || 'No email',
-            balance: newCoins,
-            coins: newCoins,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp()
-          })
-          console.log(`✅ Created new wallet for user ${selectedChat.userId}: ${newCoins} coins`)
-        }
-      } catch (walletError) {
-        console.error('⚠️ Wallet update error (non-critical):', walletError)
-      }
-
-      // Add transaction record
-      await addDoc(collection(db, 'transactions'), {
-        userId: selectedChat.userId,
-        numericUserId: selectedChat.numericUserId || 'N/A',
-        userName: selectedChat.username,
-        userEmail: selectedChat.userEmail || 'No email',
-        type: 'Credit',
-        amount: amountNum,
-        reason: coinReason,
-        previousBalance: currentCoins,
-        newBalance: newCoins,
-        createdAt: serverTimestamp(),
-        createdBy: 'admin',
-        resellerName: selectedChat.resellerName,
-        resellerId: selectedChat.resellerId
-      })
-
-      console.log(`✅ Transaction recorded: Credit ${amountNum} coins`)
-      
-      // Send a message in the chat about coins being added
-      try {
-        const messagesRef = collection(db, 'resellerChats', selectedChat.id, 'messages')
-        await addDoc(messagesRef, {
-          text: `✅ ${amountNum} coins have been added to your account! New balance: ${newCoins} coins`,
-          message: `✅ ${amountNum} coins have been added to your account! New balance: ${newCoins} coins`,
-          content: `✅ ${amountNum} coins have been added to your account! New balance: ${newCoins} coins`,
-          senderType: 'admin',
-          isAdmin: true,
-          senderId: adminUser?.uid || 'admin',
-          senderName: 'Admin',
-          timestamp: serverTimestamp(),
-          createdAt: serverTimestamp(),
-          isSystemMessage: true
-        })
-
-        // Update last message in chat document
-        const chatRef = doc(db, 'resellerChats', selectedChat.id)
-        await updateDoc(chatRef, {
-          lastMessage: `${amountNum} coins added`,
-          lastMessageTime: serverTimestamp(),
-          lastMessageBy: 'admin',
-          unreadByUser: true
-        })
-      } catch (msgError) {
-        console.error('Error sending system message:', msgError)
-      }
-
-      showToast(`${amountNum} coins added successfully! New balance: ${newCoins}`, 'success')
-      setShowAddCoinsModal(false)
-      setCoinAmount('')
-      setCoinReason('Purchase')
-      scrollToBottom()
-    } catch (error) {
-      console.error('❌ Error adding coins:', error)
-      showToast(`Error adding coins: ${error.message}`, 'error')
-    }
-    setAddingCoins(false)
-  }
-
   const filteredChats = chats.filter(chat =>
     chat.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
     chat.numericUserId.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -412,13 +278,6 @@ const Resellers = () => {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => setShowAddCoinsModal(true)}
-                      className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-colors font-medium text-sm"
-                    >
-                      <Coins className="w-4 h-4" />
-                      Add Coins
-                    </button>
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                       selectedChat.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
                     }`}>
@@ -517,87 +376,6 @@ const Resellers = () => {
           </div>
         </div>
       </motion.div>
-
-      {/* Add Coins Modal */}
-      <Modal
-        isOpen={showAddCoinsModal}
-        onClose={() => {
-          setShowAddCoinsModal(false)
-          setCoinAmount('')
-          setCoinReason('Purchase')
-        }}
-        title="Add Coins to User Account"
-      >
-        {selectedChat && (
-          <div className="space-y-4">
-            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">User</p>
-              <p className="font-semibold">{selectedChat.username}</p>
-              <p className="text-xs text-primary-600 dark:text-primary-400 font-mono font-bold mt-1">
-                ID: {selectedChat.numericUserId}
-              </p>
-              <p className="text-xs text-purple-600 dark:text-purple-400 font-semibold mt-1">
-                Reseller: {selectedChat.resellerName}
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Amount (Coins)</label>
-              <input
-                type="number"
-                value={coinAmount}
-                onChange={(e) => setCoinAmount(e.target.value)}
-                placeholder="Enter coin amount"
-                className="input-field w-full"
-                min="1"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Reason</label>
-              <select
-                value={coinReason}
-                onChange={(e) => setCoinReason(e.target.value)}
-                className="input-field w-full"
-              >
-                <option value="Purchase">Purchase</option>
-                <option value="Bonus">Bonus</option>
-                <option value="Refund">Refund</option>
-                <option value="Reseller Purchase">Reseller Purchase</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-
-            <div className="flex gap-3 pt-4">
-              <button
-                onClick={() => {
-                  setShowAddCoinsModal(false)
-                  setCoinAmount('')
-                  setCoinReason('Purchase')
-                }}
-                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                disabled={addingCoins}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddCoins}
-                disabled={addingCoins || !coinAmount || !coinReason}
-                className="flex-1 px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-              >
-                {addingCoins ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Adding...
-                  </span>
-                ) : (
-                  'Add Coins'
-                )}
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
     </div>
   )
 }

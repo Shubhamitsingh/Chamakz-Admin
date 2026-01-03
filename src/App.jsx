@@ -6,14 +6,10 @@ import ErrorBoundary from './components/ErrorBoundary'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Users from './pages/Users'
-import Wallet from './pages/Wallet'
 import Transactions from './pages/Transactions'
 import TicketsV2 from './pages/TicketsV2'
 import Chats from './pages/Chats'
 import Feedback from './pages/Feedback'
-import Approvals from './pages/Approvals'
-import AccountApproval from './pages/AccountApproval'
-import CoinReseller from './pages/CoinReseller'
 import Events from './pages/Events'
 import Settings from './pages/Settings'
 
@@ -38,14 +34,10 @@ function App() {
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="users" element={<Users />} />
-            <Route path="wallet" element={<Wallet />} />
             <Route path="transactions" element={<Transactions />} />
             <Route path="tickets" element={<TicketsV2 />} />
             <Route path="chats" element={<Chats />} />
             <Route path="feedback" element={<Feedback />} />
-            <Route path="approvals" element={<Approvals />} />
-            <Route path="account-approval" element={<AccountApproval />} />
-            <Route path="coinreseller" element={<CoinReseller />} />
             <Route path="events" element={<Events />} />
             <Route path="settings" element={<Settings />} />
             </Route>

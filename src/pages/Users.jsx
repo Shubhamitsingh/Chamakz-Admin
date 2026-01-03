@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Filter, Eye, Ban, CheckCircle, Users as UsersIcon, AlertCircle } from 'lucide-react'
+import { Filter, Eye, Ban, CheckCircle, Users as UsersIcon, AlertCircle, Video, VideoOff } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import SearchBar from '../components/SearchBar'
 import Table from '../components/Table'
 import Modal from '../components/Modal'
 import Loader from '../components/Loader'
-import { collection, doc, updateDoc, onSnapshot } from 'firebase/firestore'
+import { collection, doc, updateDoc, onSnapshot, serverTimestamp } from 'firebase/firestore'
 import { db } from '../firebase/config'
 
 const Users = () => {
@@ -16,6 +16,7 @@ const Users = () => {
   
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('All')
+  const [filterLiveApproval, setFilterLiveApproval] = useState('All')
   const [selectedUser, setSelectedUser] = useState(null)
   const [showUserModal, setShowUserModal] = useState(false)
   const [users, setUsers] = useState([])
@@ -90,7 +91,8 @@ const Users = () => {
                     joinDate: joinDate,
                     lastActive: lastActive,
                     phone: data.phone || '',
-                    region: data.region || ''
+                    region: data.region || '',
+                    isActive: data.isActive === true // Live streaming approval status - default is false (not approved)
                   })
                 } catch (e) {
                   console.error('Error processing document:', docSnapshot.id, e)
@@ -153,10 +155,16 @@ const Users = () => {
   const handleUpdateUser = async (userId, updates) => {
     try {
       const userRef = doc(db, 'users', userId)
-      await updateDoc(userRef, {
+      const updateData = {
         ...updates,
-        blocked: updates.status === 'Blocked'
-      })
+        updatedAt: serverTimestamp()
+      }
+      
+      if (updates.status !== undefined) {
+        updateData.blocked = updates.status === 'Blocked'
+      }
+      
+      await updateDoc(userRef, updateData)
       if (showToast) {
         showToast(`User ${updates.status === 'Blocked' ? 'blocked' : 'activated'} successfully`)
       }
@@ -164,6 +172,29 @@ const Users = () => {
       console.error('Error updating user:', error)
       if (showToast) {
         showToast('Error updating user', 'error')
+      }
+    }
+  }
+
+  // Toggle live streaming approval
+  const handleToggleLiveApproval = async (userId, currentStatus) => {
+    try {
+      const userRef = doc(db, 'users', userId)
+      const newStatus = !currentStatus
+      await updateDoc(userRef, {
+        isActive: newStatus,
+        updatedAt: serverTimestamp()
+      })
+      if (showToast) {
+        showToast(
+          `User ${newStatus ? 'approved' : 'disapproved'} for live streaming`,
+          'success'
+        )
+      }
+    } catch (error) {
+      console.error('Error updating live streaming approval:', error)
+      if (showToast) {
+        showToast('Error updating live streaming approval', 'error')
       }
     }
   }
@@ -180,10 +211,21 @@ const Users = () => {
       (user.email || '').toLowerCase().includes(searchLower) ||
       (user.numericUserId || '').toLowerCase().includes(searchLower)
     
-    const matchesFilter = filterStatus === 'All' || user.status === filterStatus
+    const matchesStatusFilter = filterStatus === 'All' || user.status === filterStatus
     
-    return matchesSearch && matchesFilter
+    const matchesLiveFilter = filterLiveApproval === 'All' || 
+      (filterLiveApproval === 'Approved' && user.isActive === true) ||
+      (filterLiveApproval === 'Not Approved' && user.isActive !== true)
+    
+    return matchesSearch && matchesStatusFilter && matchesLiveFilter
   })
+
+  // Calculate stats
+  const liveApprovalStats = {
+    total: users.length,
+    approved: users.filter(u => u.isActive === true).length,
+    notApproved: users.filter(u => u.isActive !== true).length
+  }
 
   // Show loading state
   if (loading && !error) {
@@ -315,6 +357,34 @@ const Users = () => {
       },
     },
     {
+      header: 'Live Streaming',
+      accessor: 'isActive',
+      render: (row) => {
+        const isApproved = row?.isActive === true // Only true means approved, everything else is not approved
+        return (
+          <div className="flex items-center gap-2">
+            <span className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${
+              isApproved 
+                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
+                : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+            }`}>
+              {isApproved ? (
+                <>
+                  <Video className="w-3 h-3" />
+                  Approved
+                </>
+              ) : (
+                <>
+                  <VideoOff className="w-3 h-3" />
+                  Not Approved
+                </>
+              )}
+            </span>
+          </div>
+        )
+      },
+    },
+    {
       header: 'Coins',
       accessor: 'coins',
       render: (row) => <span className="font-semibold">{((row?.coins) || 0).toLocaleString()}</span>,
@@ -333,6 +403,7 @@ const Users = () => {
       header: 'Actions',
       render: (row) => {
         if (!row) return null
+        const isApproved = row?.isActive === true // Only true means approved
         return (
           <div className="flex gap-2">
             <button
@@ -359,6 +430,21 @@ const Users = () => {
                 <CheckCircle className="w-4 h-4 text-green-500" />
               )}
             </button>
+            <button
+              onClick={() => handleToggleLiveApproval(row.id, isApproved)}
+              className={`p-2 rounded-lg transition-colors ${
+                isApproved
+                  ? 'hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400'
+                  : 'hover:bg-green-100 dark:hover:bg-green-900/30 text-green-600 dark:text-green-400'
+              }`}
+              title={isApproved ? 'Disapprove Live Streaming' : 'Approve Live Streaming'}
+            >
+              {isApproved ? (
+                <VideoOff className="w-4 h-4" />
+              ) : (
+                <Video className="w-4 h-4" />
+              )}
+            </button>
           </div>
         )
       },
@@ -375,6 +461,49 @@ const Users = () => {
         <h1 className="text-3xl font-bold mb-2">Users Management</h1>
         <p className="text-gray-600 dark:text-gray-400">Manage all users and their activities</p>
       </motion.div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="card flex items-center gap-4">
+          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+            <UsersIcon className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Total Users</p>
+            <p className="text-2xl font-bold">{liveApprovalStats.total}</p>
+          </div>
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="card flex items-center gap-4">
+          <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
+            <Video className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Live Approved</p>
+            <p className="text-2xl font-bold">{liveApprovalStats.approved}</p>
+          </div>
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="card flex items-center gap-4">
+          <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-lg flex items-center justify-center">
+            <VideoOff className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Not Approved</p>
+            <p className="text-2xl font-bold">{liveApprovalStats.notApproved}</p>
+          </div>
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="card flex items-center gap-4">
+          <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-lg flex items-center justify-center">
+            <CheckCircle className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Active Users</p>
+            <p className="text-2xl font-bold">{users.filter(u => u.status === 'Active').length}</p>
+          </div>
+        </motion.div>
+      </div>
 
       {/* Filters */}
       <motion.div
@@ -395,9 +524,18 @@ const Users = () => {
               onChange={(e) => setFilterStatus(e.target.value)}
               className="input-field"
             >
-              <option value="All">All Users</option>
+              <option value="All">All Status</option>
               <option value="Active">Active</option>
               <option value="Blocked">Blocked</option>
+            </select>
+            <select
+              value={filterLiveApproval}
+              onChange={(e) => setFilterLiveApproval(e.target.value)}
+              className="input-field"
+            >
+              <option value="All">All Live Status</option>
+              <option value="Approved">Live Approved</option>
+              <option value="Not Approved">Not Approved</option>
             </select>
           </div>
         </div>
@@ -471,6 +609,28 @@ const Users = () => {
                 <p className="text-sm text-gray-600 dark:text-gray-400">Last Active</p>
                 <p className="font-medium">{selectedUser.lastActive || 'N/A'}</p>
               </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Live Streaming Approval</p>
+                <div className="flex items-center gap-2">
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${
+                    selectedUser.isActive === true
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
+                      : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                  }`}>
+                    {selectedUser.isActive === true ? (
+                      <>
+                        <Video className="w-3 h-3" />
+                        Approved
+                      </>
+                    ) : (
+                      <>
+                        <VideoOff className="w-3 h-3" />
+                        Not Approved
+                      </>
+                    )}
+                  </span>
+                </div>
+              </div>
             </div>
             <div className="flex gap-2 pt-4">
               <button
@@ -482,6 +642,34 @@ const Users = () => {
                 className={`${selectedUser.status === 'Active' ? 'btn-danger' : 'btn-primary'} flex-1`}
               >
                 {selectedUser.status === 'Active' ? 'Block User' : 'Activate User'}
+              </button>
+              <button
+                onClick={() => {
+                  const currentApproval = selectedUser.isActive === true
+                  handleToggleLiveApproval(selectedUser.id, currentApproval)
+                  // Update local state to reflect change immediately
+                  setSelectedUser({
+                    ...selectedUser,
+                    isActive: !currentApproval
+                  })
+                }}
+                className={`${
+                  selectedUser.isActive === true
+                    ? 'bg-red-600 hover:bg-red-700 text-white'
+                    : 'bg-green-600 hover:bg-green-700 text-white'
+                } flex-1 px-4 py-2.5 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2`}
+              >
+                {selectedUser.isActive === true ? (
+                  <>
+                    <VideoOff className="w-4 h-4" />
+                    Disapprove Live
+                  </>
+                ) : (
+                  <>
+                    <Video className="w-4 h-4" />
+                    Approve Live
+                  </>
+                )}
               </button>
             </div>
           </div>

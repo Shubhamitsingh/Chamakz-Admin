@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Users, Coins, Ticket, MessageSquare, Key } from 'lucide-react'
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { Users, Ticket, MessageSquare, Key } from 'lucide-react'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { useApp } from '../context/AppContext'
 import StatCard from '../components/StatCard'
 import Loader from '../components/Loader'
@@ -13,15 +13,13 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({
     totalUsers: 0,
-    totalCoins: 0,
     activeTickets: 0,
     ongoingChats: 0,
     approvedHosts: 0
   })
   const [recentActivity, setRecentActivity] = useState([])
   const [chartData, setChartData] = useState({
-    userActivity: [],
-    coinTransactions: []
+    userActivity: []
   })
 
   // Fetch real statistics from Firebase
@@ -33,17 +31,6 @@ const Dashboard = () => {
         // Fetch total users count
         const usersSnapshot = await getDocs(collection(db, 'users'))
         const totalUsers = usersSnapshot.size
-
-        // Fetch total coins (sum all wallet balances)
-        let totalCoins = 0
-        try {
-          const walletsSnapshot = await getDocs(collection(db, 'wallets'))
-          walletsSnapshot.forEach(doc => {
-            totalCoins += doc.data().balance || 0
-          })
-        } catch (error) {
-          // Wallets collection may not exist yet
-        }
 
         // Fetch active tickets count
         let activeTickets = 0
@@ -142,52 +129,6 @@ const Dashboard = () => {
           }
         }
 
-        // Fetch coin transactions data for last 6 months
-        const coinTransactionData = []
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']
-        const currentMonth = new Date().getMonth()
-        
-        for (let i = 5; i >= 0; i--) {
-          const monthIndex = (currentMonth - i + 12) % 12
-          const monthName = months[monthIndex]
-          
-          try {
-            const monthStart = new Date(new Date().getFullYear(), monthIndex, 1)
-            const monthEnd = new Date(new Date().getFullYear(), monthIndex + 1, 0)
-            
-            const transactionsQuery = query(
-              collection(db, 'transactions'),
-              where('createdAt', '>=', Timestamp.fromDate(monthStart)),
-              where('createdAt', '<=', Timestamp.fromDate(monthEnd))
-            )
-            const transactionsSnapshot = await getDocs(transactionsQuery)
-            
-            let credits = 0
-            let debits = 0
-            
-            transactionsSnapshot.forEach(doc => {
-              const data = doc.data()
-              if (data.type === 'Credit') {
-                credits += data.amount || 0
-              } else if (data.type === 'Debit') {
-                debits += data.amount || 0
-              }
-            })
-
-            coinTransactionData.push({
-              name: monthName,
-              credits,
-              debits
-            })
-          } catch (error) {
-            coinTransactionData.push({
-              name: monthName,
-              credits: 0,
-              debits: 0
-            })
-          }
-        }
-
         // Fetch recent users as activity
         const recentUsersQuery = query(
           collection(db, 'users'),
@@ -208,7 +149,6 @@ const Dashboard = () => {
 
         setStats(prevStats => ({
           totalUsers,
-          totalCoins,
           activeTickets,
           ongoingChats,
           approvedHosts: prevStats.approvedHosts // Keep existing value, will be updated by real-time listener
@@ -223,14 +163,6 @@ const Dashboard = () => {
             { name: 'Fri', users: 0, active: 0 },
             { name: 'Sat', users: 0, active: 0 },
             { name: 'Sun', users: 0, active: 0 }
-          ],
-          coinTransactions: coinTransactionData.length > 0 ? coinTransactionData : [
-            { name: 'Jan', credits: 0, debits: 0 },
-            { name: 'Feb', credits: 0, debits: 0 },
-            { name: 'Mar', credits: 0, debits: 0 },
-            { name: 'Apr', credits: 0, debits: 0 },
-            { name: 'May', credits: 0, debits: 0 },
-            { name: 'Jun', credits: 0, debits: 0 }
           ]
         })
         setLoading(false)
@@ -303,13 +235,6 @@ const Dashboard = () => {
       trend: { positive: true, value: `${stats.totalUsers}`, label: 'registered users' },
     },
     {
-      title: 'Total Coins in Circulation',
-      value: stats.totalCoins.toLocaleString(),
-      icon: Coins,
-      color: 'secondary',
-      trend: { positive: true, value: `${stats.totalCoins}`, label: 'total coins' },
-    },
-    {
       title: 'Active Tickets',
       value: stats.activeTickets,
       icon: Ticket,
@@ -359,14 +284,14 @@ const Dashboard = () => {
       </motion.div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {statCards.map((card, index) => (
           <StatCard key={index} {...card} delay={index * 0.1} />
         ))}
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         {/* User Activity Chart */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -385,27 +310,6 @@ const Dashboard = () => {
               <Line type="monotone" dataKey="users" stroke="#22c55e" strokeWidth={2} />
               <Line type="monotone" dataKey="active" stroke="#0ea5e9" strokeWidth={2} />
             </LineChart>
-          </ResponsiveContainer>
-        </motion.div>
-
-        {/* Coin Transactions Chart */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="card"
-        >
-          <h2 className="text-xl font-bold mb-4">Coin Transactions (Monthly)</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={chartData.coinTransactions}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="credits" fill="#22c55e" />
-              <Bar dataKey="debits" fill="#ef4444" />
-            </BarChart>
           </ResponsiveContainer>
         </motion.div>
       </div>

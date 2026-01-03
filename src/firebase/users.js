@@ -292,6 +292,48 @@ export const subscribeToUsers = (callback) => {
   })
 }
 
+/**
+ * Reset all users' live streaming approval to false (not approved)
+ * This is a one-time migration function to set all existing users to "not approved"
+ * @returns {Promise} Success status with count of updated users
+ */
+export const resetAllLiveApprovals = async () => {
+  try {
+    const usersCollection = collection(db, USERS_COLLECTION)
+    const snapshot = await getDocs(usersCollection)
+    
+    let updatedCount = 0
+    const updatePromises = []
+    
+    snapshot.forEach((docSnapshot) => {
+      const data = docSnapshot.data()
+      // Only update users who currently have isActive = true
+      if (data.isActive === true) {
+        const userRef = doc(db, USERS_COLLECTION, docSnapshot.id)
+        updatePromises.push(
+          updateDoc(userRef, {
+            isActive: false,
+            updatedAt: serverTimestamp()
+          })
+        )
+        updatedCount++
+      }
+    })
+    
+    // Execute all updates
+    await Promise.all(updatePromises)
+    
+    return { 
+      success: true, 
+      updatedCount,
+      message: `Successfully reset ${updatedCount} user(s) to "Not Approved" status`
+    }
+  } catch (error) {
+    console.error('Error resetting live approvals:', error)
+    return { success: false, error: error.message }
+  }
+}
+
 
 
 
