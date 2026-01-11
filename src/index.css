@@ -10,23 +10,51 @@
 
 @layer components {
   .card {
-    @apply bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 transition-all;
+    @apply bg-white dark:bg-gray-800 rounded-xl shadow-card border border-gray-100 dark:border-gray-700/50 p-6 transition-all hover:shadow-card-hover;
   }
   
   .btn-primary {
-    @apply bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white font-medium px-4 py-2 rounded-lg transition-all shadow-md hover:shadow-lg;
+    @apply bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 
+           text-white font-medium px-5 py-2.5 rounded-lg 
+           transition-all duration-200 shadow-sm hover:shadow-md 
+           active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
   }
   
   .btn-secondary {
-    @apply bg-gradient-to-r from-secondary-500 to-secondary-600 hover:from-secondary-600 hover:to-secondary-700 text-white font-medium px-4 py-2 rounded-lg transition-all shadow-md hover:shadow-lg;
+    @apply bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 
+           text-gray-700 dark:text-gray-200 font-medium px-5 py-2.5 rounded-lg 
+           hover:bg-gray-50 dark:hover:bg-gray-700 
+           transition-all duration-200 shadow-sm hover:shadow-md 
+           active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2;
   }
   
   .btn-danger {
-    @apply bg-red-500 hover:bg-red-600 text-white font-medium px-4 py-2 rounded-lg transition-all;
+    @apply bg-red-500 hover:bg-red-600 text-white font-medium px-5 py-2.5 rounded-lg 
+           transition-all duration-200 shadow-sm hover:shadow-md 
+           active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2;
+  }
+  
+  .btn-ghost {
+    @apply text-gray-700 dark:text-gray-200 font-medium px-4 py-2 rounded-lg 
+           hover:bg-gray-100 dark:hover:bg-gray-700 
+           transition-all duration-200;
   }
   
   .input-field {
-    @apply w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 transition-all;
+    @apply w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 
+           rounded-lg bg-white dark:bg-gray-800 
+           text-gray-900 dark:text-gray-100
+           placeholder:text-gray-400 dark:placeholder:text-gray-500
+           focus:ring-2 focus:ring-primary-500 focus:border-transparent 
+           transition-all duration-200
+           disabled:bg-gray-50 dark:disabled:bg-gray-900 
+           disabled:text-gray-500 dark:disabled:text-gray-400 
+           disabled:cursor-not-allowed;
+  }
+  
+  .input-field-error {
+    @apply border-red-300 dark:border-red-700 
+           focus:ring-red-500 focus:border-transparent;
   }
 }
 

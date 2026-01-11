@@ -10,11 +10,11 @@ import { db, auth, storage } from '../firebase/config'
 const Settings = () => {
   const { darkMode, toggleDarkMode, showToast, user } = useApp()
   const [settings, setSettings] = useState({
-    appName: 'Chamak Admin',
-    supportEmail: 'support@chamakadmin.com',
+    appName: 'Chamakz Admin',
+    supportEmail: 'support@chamakzadmin.com',
     logo: '',
     adminName: 'Admin User',
-    adminEmail: 'admin@chamakadmin.com',
+    adminEmail: 'admin@chamakzadmin.com',
     notifications: true,
     emailAlerts: true,
     smsAlerts: false,

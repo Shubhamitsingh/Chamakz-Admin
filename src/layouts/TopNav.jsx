@@ -469,7 +469,7 @@ const TopNav = () => {
           <div className="flex items-center gap-3 ml-2 pl-2 border-l border-gray-300 dark:border-gray-600">
             <div className="text-right hidden md:block">
               <p className="text-sm font-medium">{adminName}</p>
-              <p className="text-xs text-gray-500">{user?.email || auth.currentUser?.email || 'admin@chamakadmin.com'}</p>
+              <p className="text-xs text-gray-500">{user?.email || auth.currentUser?.email || 'admin@chamakzadmin.com'}</p>
             </div>
             {adminAvatar ? (
               <img 

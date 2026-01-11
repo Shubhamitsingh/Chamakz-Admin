@@ -44,10 +44,12 @@ const Sidebar = () => {
               animate={{ opacity: sidebarOpen ? 1 : 0 }}
               className="flex items-center gap-2"
             >
-              <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">C</span>
-              </div>
-              {sidebarOpen && <span className="font-bold text-xl">Chamak Admin</span>}
+              <img 
+                src="/logo.png" 
+                alt="Chamakz Admin Logo" 
+                className="w-8 h-8 object-contain"
+              />
+              {sidebarOpen && <span className="font-bold text-xl">Chamakz Admin</span>}
             </motion.div>
             <button
               onClick={toggleSidebar}

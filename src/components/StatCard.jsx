@@ -19,15 +19,15 @@ const StatCard = ({ title, value, icon: Icon, color = 'primary', trend, delay = 
       <div className={`bg-gradient-to-r ${gradients[color]} h-2 mb-4 rounded-full`}></div>
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <p className="text-gray-600 dark:text-gray-400 text-sm font-medium mb-2">{title}</p>
+          <p className="text-gray-600 dark:text-gray-400 text-sm font-medium mb-1">{title}</p>
           <h3 className="text-3xl font-bold mb-2">{value}</h3>
           {trend && (
-            <p className={`text-sm ${trend.positive ? 'text-green-500' : 'text-red-500'}`}>
+            <p className={`text-xs text-gray-500 dark:text-gray-400 mt-2`}>
               {trend.value} {trend.label}
             </p>
           )}
         </div>
-        <div className={`bg-gradient-to-br ${gradients[color]} p-3 rounded-lg`}>
+        <div className={`bg-gradient-to-br ${gradients[color]} w-12 h-12 rounded-xl flex items-center justify-center shadow-sm`}>
           <Icon className="w-6 h-6 text-white" />
         </div>
       </div>

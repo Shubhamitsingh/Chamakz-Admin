@@ -107,7 +107,7 @@ const Login = () => {
             >
               <span className="text-white font-bold text-3xl">C</span>
             </motion.div>
-            <h1 className="text-3xl font-bold mb-2">Chamak Admin</h1>
+            <h1 className="text-3xl font-bold mb-2">Chamakz Admin</h1>
             <p className="text-gray-600 dark:text-gray-400">
               Sign in to access the admin panel
             </p>
@@ -244,7 +244,7 @@ const Login = () => {
           transition={{ delay: 0.5 }}
           className="text-center mt-6 text-white/80 text-sm"
         >
-          Chamak Admin Panel v1.0.0
+          Chamakz Admin Panel v1.0.0
         </motion.div>
       </motion.div>
 

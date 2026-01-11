@@ -5,18 +5,18 @@ const Table = ({ columns, data, onRowClick }) => {
     <div className="overflow-x-auto">
       <table className="w-full">
         <thead>
-          <tr className="border-b-2 border-gray-200 dark:border-gray-700">
+          <tr className="border-b border-gray-200 dark:border-gray-700">
             {columns.map((column, index) => (
               <th
                 key={index}
-                className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300"
+                className="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider"
               >
                 {column.header}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody>
+        <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
           {data.map((row, rowIndex) => (
             <motion.tr
               key={rowIndex}
@@ -24,7 +24,7 @@ const Table = ({ columns, data, onRowClick }) => {
               animate={{ opacity: 1 }}
               transition={{ delay: rowIndex * 0.05 }}
               onClick={() => onRowClick && onRowClick(row)}
-              className={`border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${
+              className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
                 onRowClick ? 'cursor-pointer' : ''
               }`}
             >
@@ -58,7 +58,7 @@ const Table = ({ columns, data, onRowClick }) => {
                   }
                 }
                 return (
-                  <td key={colIndex} className="px-4 py-3 text-sm">
+                  <td key={colIndex} className="px-6 py-4 text-sm whitespace-nowrap">
                     {cellContent}
                   </td>
                 )
