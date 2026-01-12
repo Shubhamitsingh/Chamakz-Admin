@@ -8,6 +8,7 @@ import Modal from '../components/Modal'
 import Loader from '../components/Loader'
 import { collection, doc, updateDoc, onSnapshot, serverTimestamp } from 'firebase/firestore'
 import { db } from '../firebase/config'
+import { fixIncorrectNewUserPermissions } from '../firebase/users'
 
 const Users = () => {
   const appContext = useApp()
@@ -22,6 +23,10 @@ const Users = () => {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [fixingPermissions, setFixingPermissions] = useState(false)
+
+  // Manual approval function - Only admin can approve/disapprove users for live streaming
+  // Automatic fixing removed to prevent permission errors
 
   // Fetch users from Firebase
   useEffect(() => {
@@ -80,6 +85,11 @@ const Users = () => {
                   // Determine role: if user has liveApprovalCode, they are a Host
                   const userRole = data.role || (data.liveApprovalCode ? 'Host' : 'User')
                   
+                  // IMPORTANT: New users default to isActive: false (NOT approved for live streaming)
+                  // Only admin can approve users manually via the approve/disapprove buttons
+                  // If isActive field doesn't exist or is false/undefined → user is NOT approved
+                  const isActive = data.isActive === true // Only explicitly true means approved
+                  
                   usersData.push({
                     id: docSnapshot.id,
                     numericUserId: data.numericUserId || 'N/A',
@@ -92,12 +102,16 @@ const Users = () => {
                     lastActive: lastActive,
                     phone: data.phone || '',
                     region: data.region || '',
-                    isActive: data.isActive === true // Live streaming approval status - default is false (not approved)
+                    isActive: isActive // Live streaming approval: false by default, only admin can approve
                   })
                 } catch (e) {
                   console.error('Error processing document:', docSnapshot.id, e)
                 }
               })
+              
+              // Note: Users with incorrect permissions are detected but NOT automatically fixed
+              // Admin must manually approve/disapprove users using the approve/disapprove buttons
+              // This prevents Firebase permission errors
               
               if (isMounted) {
                 setUsers(usersData)
@@ -176,15 +190,28 @@ const Users = () => {
     }
   }
 
-  // Toggle live streaming approval
+  // Manual toggle live streaming approval - Only admin can approve/disapprove
   const handleToggleLiveApproval = async (userId, currentStatus) => {
     try {
       const userRef = doc(db, 'users', userId)
       const newStatus = !currentStatus
-      await updateDoc(userRef, {
+      
+      // Prepare update data
+      const updateData = {
         isActive: newStatus,
         updatedAt: serverTimestamp()
-      })
+      }
+      
+      // If approving, set liveApprovalDate
+      if (newStatus === true) {
+        updateData.liveApprovalDate = serverTimestamp()
+      } else {
+        // If disapproving, clear approval date
+        updateData.liveApprovalDate = null
+      }
+      
+      await updateDoc(userRef, updateData)
+      
       if (showToast) {
         showToast(
           `User ${newStatus ? 'approved' : 'disapproved'} for live streaming`,
@@ -194,8 +221,32 @@ const Users = () => {
     } catch (error) {
       console.error('Error updating live streaming approval:', error)
       if (showToast) {
-        showToast('Error updating live streaming approval', 'error')
+        showToast(`Error updating live streaming approval: ${error.message}`, 'error')
       }
+    }
+  }
+
+  // Manual fix function for incorrect permissions
+  const handleFixIncorrectPermissions = async () => {
+    setFixingPermissions(true)
+    try {
+      const result = await fixIncorrectNewUserPermissions(7) // Check last 7 days
+      if (result.success) {
+        if (showToast) {
+          showToast(result.message || `Fixed ${result.fixedCount} user(s)`, 'success')
+        }
+      } else {
+        if (showToast) {
+          showToast(result.error || 'Error fixing permissions', 'error')
+        }
+      }
+    } catch (error) {
+      console.error('Error fixing permissions:', error)
+      if (showToast) {
+        showToast('Error fixing permissions', 'error')
+      }
+    } finally {
+      setFixingPermissions(false)
     }
   }
 
@@ -457,9 +508,30 @@ const Users = () => {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
+        className="flex items-center justify-between"
       >
-        <h1 className="text-3xl font-bold mb-2">Users Management</h1>
-        <p className="text-gray-600 dark:text-gray-400">Manage all users and their activities</p>
+        <div>
+          <h1 className="text-3xl font-bold mb-2">Users Management</h1>
+          <p className="text-gray-600 dark:text-gray-400">Manage all users and their activities</p>
+        </div>
+        <button
+          onClick={handleFixIncorrectPermissions}
+          disabled={fixingPermissions || loading}
+          className="btn-secondary flex items-center gap-2 disabled:opacity-50"
+          title="Fix new users who incorrectly have live permission enabled"
+        >
+          {fixingPermissions ? (
+            <>
+              <div className="w-4 h-4 border-2 border-gray-400/30 border-t-gray-600 rounded-full animate-spin" />
+              Fixing...
+            </>
+          ) : (
+            <>
+              <AlertCircle className="w-4 h-4" />
+              Fix Permissions
+            </>
+          )}
+        </button>
       </motion.div>
 
       {/* Stats Cards */}

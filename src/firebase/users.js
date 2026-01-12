@@ -334,6 +334,78 @@ export const resetAllLiveApprovals = async () => {
   }
 }
 
+/**
+ * Fix new users who incorrectly have isActive: true
+ * This function finds users who:
+ * - Have isActive: true
+ * - Were created within the last N days (default 7 days)
+ * - Don't have liveApprovalDate (not approved by admin)
+ * And sets their isActive to false
+ * @param {number} daysSinceCreation - Number of days to check back (default: 7)
+ * @returns {Promise} Success status with count of fixed users
+ */
+export const fixIncorrectNewUserPermissions = async (daysSinceCreation = 7) => {
+  try {
+    const usersCollection = collection(db, USERS_COLLECTION)
+    const snapshot = await getDocs(usersCollection)
+    
+    const cutoffDate = new Date()
+    cutoffDate.setDate(cutoffDate.getDate() - daysSinceCreation)
+    
+    let fixedCount = 0
+    const updatePromises = []
+    
+    snapshot.forEach((docSnapshot) => {
+      const data = docSnapshot.data()
+      
+      // Get creation date
+      let createdAt = null
+      if (data.createdAt) {
+        createdAt = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt)
+      } else if (data.created_at) {
+        createdAt = data.created_at.toDate ? data.created_at.toDate() : new Date(data.created_at)
+      } else if (data.timestamp) {
+        createdAt = data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestamp)
+      }
+      
+      // Check if user should be fixed:
+      // 1. Has isActive: true
+      // 2. Was created within the last N days (new user)
+      // 3. Doesn't have liveApprovalDate (not approved by admin)
+      // 4. Doesn't have liveApprovalCode (not approved by admin)
+      const isNewUser = createdAt && createdAt >= cutoffDate
+      const hasIncorrectPermission = data.isActive === true && 
+                                     isNewUser && 
+                                     !data.liveApprovalDate && 
+                                     !data.liveApprovalCode
+      
+      if (hasIncorrectPermission) {
+        const userRef = doc(db, USERS_COLLECTION, docSnapshot.id)
+        updatePromises.push(
+          updateDoc(userRef, {
+            isActive: false,
+            updatedAt: serverTimestamp()
+          })
+        )
+        fixedCount++
+        console.log(`🔧 Fixing user ${docSnapshot.id}: Set isActive to false (new user without admin approval)`)
+      }
+    })
+    
+    // Execute all updates
+    await Promise.all(updatePromises)
+    
+    return { 
+      success: true, 
+      fixedCount,
+      message: `Successfully fixed ${fixedCount} new user(s) with incorrect live permissions`
+    }
+  } catch (error) {
+    console.error('Error fixing new user permissions:', error)
+    return { success: false, error: error.message }
+  }
+}
+
 
 
 

@@ -193,8 +193,9 @@ const Dashboard = () => {
           
           snapshot.forEach(doc => {
             const userData = doc.data()
-            // Count users who have approval code assigned (approved by admin)
-            if (userData.liveApprovalCode) {
+            // Count users who are approved for live streaming (isActive === true)
+            // This matches the "Live Approved" count in Users page
+            if (userData.isActive === true) {
               approvedCount++
             }
           })

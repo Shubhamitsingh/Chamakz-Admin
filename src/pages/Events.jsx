@@ -223,6 +223,30 @@ const Events = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    e.stopPropagation()
+    
+    console.log('📝 Form submitted!', { activeTab, formData, modalMode })
+    
+    // Validate required fields
+    if (!formData.title || !formData.description) {
+      console.log('❌ Validation failed: Missing title or description')
+      showToast('Please fill in all required fields (Title and Description)', 'error')
+      return
+    }
+    
+    if (activeTab === 'announcements' && !formData.date) {
+      console.log('❌ Validation failed: Missing date')
+      showToast('Please select a display date', 'error')
+      return
+    }
+    
+    if (activeTab === 'events' && (!formData.startDate || !formData.endDate)) {
+      console.log('❌ Validation failed: Missing dates')
+      showToast('Please select both start and end dates', 'error')
+      return
+    }
+    
+    console.log('✅ Validation passed, starting submission...')
     setProcessing(true)
     setUploading(false)
 
@@ -264,9 +288,9 @@ const Events = () => {
       
       if (activeTab === 'announcements') {
         const announcementData = {
-          title: formData.title,
-          description: formData.description,
-          message: formData.description, // For Flutter app compatibility
+          title: formData.title.trim(),
+          description: formData.description.trim(),
+          message: formData.description.trim(), // For Flutter app compatibility
           date: formData.date,
           displayDate: formData.date, // For Flutter app
           priority: formData.priority,
@@ -277,15 +301,17 @@ const Events = () => {
           timestamp: serverTimestamp() // Alternative timestamp field
         }
 
+        console.log('📢 Creating announcement with data:', announcementData)
+
         if (modalMode === 'add') {
           const docRef = await addDoc(collection(db, 'announcements'), announcementData)
           console.log('✅ Announcement created with ID:', docRef.id)
           showToast('Announcement created successfully! It will appear in your app.', 'success')
         } else {
           await updateDoc(doc(db, 'announcements', selectedItem.id), {
-            title: formData.title,
-            description: formData.description,
-            message: formData.description,
+            title: formData.title.trim(),
+            description: formData.description.trim(),
+            message: formData.description.trim(),
             date: formData.date,
             displayDate: formData.date,
             priority: formData.priority,
@@ -349,10 +375,28 @@ const Events = () => {
         banner: '',
       })
     } catch (error) {
-      console.error('Error saving:', error)
-      showToast('Error saving item: ' + error.message, 'error')
+      console.error('❌ Error saving announcement/event:', error)
+      console.error('Error details:', {
+        code: error.code,
+        message: error.message,
+        stack: error.stack
+      })
+      
+      // More user-friendly error messages
+      let errorMessage = 'Error saving item: '
+      if (error.code === 'permission-denied') {
+        errorMessage = 'Permission denied. Please check Firebase permissions.'
+      } else if (error.code === 'unavailable') {
+        errorMessage = 'Firebase service unavailable. Please check your internet connection.'
+      } else {
+        errorMessage += error.message || 'Unknown error occurred'
+      }
+      
+      showToast(errorMessage, 'error')
+    } finally {
+      setProcessing(false)
+      setUploading(false)
     }
-    setProcessing(false)
   }
 
   const filteredAnnouncements = announcements.filter(
