@@ -9,6 +9,7 @@ import Users from './pages/Users'
 import Transactions from './pages/Transactions'
 import TicketsV2 from './pages/TicketsV2'
 import Chats from './pages/Chats'
+import ChamakzTeam from './pages/ChamakzTeam'
 import Feedback from './pages/Feedback'
 import Events from './pages/Events'
 import Settings from './pages/Settings'
@@ -37,6 +38,7 @@ function App() {
             <Route path="transactions" element={<Transactions />} />
             <Route path="tickets" element={<TicketsV2 />} />
             <Route path="chats" element={<Chats />} />
+            <Route path="chamakz-team" element={<ChamakzTeam />} />
             <Route path="feedback" element={<Feedback />} />
             <Route path="events" element={<Events />} />
             <Route path="settings" element={<Settings />} />

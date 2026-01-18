@@ -12,6 +12,7 @@ import {
   LogOut,
   ChevronLeft,
   MessageCircle,
+  UsersRound,
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 
@@ -24,6 +25,7 @@ const Sidebar = () => {
     { path: '/transactions', icon: DollarSign, label: 'Payment' },
     { path: '/tickets', icon: Ticket, label: 'Tickets / Support', badge: openTicketsCount },
     { path: '/chats', icon: MessageSquare, label: 'Chats', badge: unreadChatsCount },
+    { path: '/chamakz-team', icon: UsersRound, label: 'Chamakz Team' },
     { path: '/feedback', icon: MessageCircle, label: 'Feedback' },
     { path: '/events', icon: Calendar, label: 'Events' },
     { path: '/settings', icon: Settings, label: 'Settings' },
