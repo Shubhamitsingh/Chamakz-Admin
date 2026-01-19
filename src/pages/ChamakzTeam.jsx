@@ -19,10 +19,10 @@ const ChamakzTeam = () => {
 
   // Fetch all team messages
   useEffect(() => {
-    // Check if team_message collection has permission
+    // Check if team_messages collection has permission
     // If no permission, show empty state instead of spamming errors
     const unsubscribe = onSnapshot(
-      query(collection(db, 'team_message'), orderBy('createdAt', 'desc')),
+      query(collection(db, 'team_messages'), orderBy('createdAt', 'desc')),
       (snapshot) => {
         const messagesData = snapshot.docs.map(doc => {
           const data = doc.data()
@@ -42,7 +42,7 @@ const ChamakzTeam = () => {
       (error) => {
         // Only log error once, don't spam console
         if (error.code === 'permission-denied') {
-          console.warn('⚠️ Firebase permission error: Please update Firestore security rules for "team_message" collection')
+          console.warn('⚠️ Firebase permission error: Please update Firestore security rules for "team_messages" collection')
           // Show empty state instead of error spam
           setMessages([])
           setLoading(false)
@@ -107,8 +107,8 @@ const ChamakzTeam = () => {
         imageUrl = await getDownloadURL(storageRef)
       }
 
-      // Save message to team_message collection
-      await addDoc(collection(db, 'team_message'), {
+      // Save message to team_messages collection
+      await addDoc(collection(db, 'team_messages'), {
         message: message.trim() || '',
         image: imageUrl,
         imageUrl: imageUrl,

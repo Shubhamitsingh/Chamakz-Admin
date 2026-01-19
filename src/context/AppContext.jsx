@@ -128,11 +128,14 @@ export const AppProvider = ({ children }) => {
     const unsubscribe = onSnapshot(
       collection(db, 'supportChats'),
       (snapshot) => {
-        // Sum all unreadByAdmin counts from all chats
+        // Sum ONLY unreadByAdmin counts from all chats
+        // Only count actual unread messages, not new chats
         let totalUnread = 0
+        
         snapshot.docs.forEach(doc => {
           const data = doc.data()
-          // Handle both number and undefined/null cases - ensure we get a valid number
+          
+          // Count ONLY unread messages (unreadByAdmin field)
           let unread = 0
           if (typeof data.unreadByAdmin === 'number') {
             unread = data.unreadByAdmin
@@ -140,14 +143,24 @@ export const AppProvider = ({ children }) => {
             const parsed = parseInt(data.unreadByAdmin)
             unread = isNaN(parsed) ? 0 : parsed
           }
-          totalUnread += Math.max(0, unread) // Ensure non-negative
+          
+          // Only add if there are actual unread messages
+          totalUnread += Math.max(0, unread)
+          
           if (unread > 0) {
             console.log(`📊 Chat ${doc.id}: unreadByAdmin = ${unread}`)
           }
         })
         
-        console.log('💬 Total unread chat messages:', totalUnread, '(from', snapshot.size, 'chats)')
-        setUnreadChatsCount(Math.max(0, totalUnread))
+        console.log('💬 Total unread messages:', totalUnread, '(from', snapshot.size, 'chats)')
+        console.log('🔔 Setting badge count to:', totalUnread)
+        
+        // Force update even if same value to ensure badge shows
+        const newCount = Math.max(0, totalUnread)
+        setUnreadChatsCount(newCount)
+        
+        // Debug: Log if count changed
+        console.log('🔔 Badge count updated to:', newCount)
       },
       (error) => {
         console.error('❌ Error fetching unread chats count:', error)

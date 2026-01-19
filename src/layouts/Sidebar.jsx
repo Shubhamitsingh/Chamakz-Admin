@@ -13,11 +13,17 @@ import {
   ChevronLeft,
   MessageCircle,
   UsersRound,
+  Image as BannerIcon,
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 
 const Sidebar = () => {
   const { sidebarOpen, toggleSidebar, logout, openTicketsCount, newUsersCount, unreadChatsCount } = useApp()
+  
+  // Debug: Log badge count
+  useEffect(() => {
+    console.log('🔔 [Sidebar] Unread chats count:', unreadChatsCount)
+  }, [unreadChatsCount])
 
   const menuItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -26,6 +32,7 @@ const Sidebar = () => {
     { path: '/tickets', icon: Ticket, label: 'Tickets / Support', badge: openTicketsCount },
     { path: '/chats', icon: MessageSquare, label: 'Chats', badge: unreadChatsCount },
     { path: '/chamakz-team', icon: UsersRound, label: 'Chamakz Team' },
+    { path: '/banners', icon: BannerIcon, label: 'Banners' },
     { path: '/feedback', icon: MessageCircle, label: 'Feedback' },
     { path: '/events', icon: Calendar, label: 'Events' },
     { path: '/settings', icon: Settings, label: 'Settings' },
@@ -79,15 +86,19 @@ const Sidebar = () => {
               >
                 <item.icon className="w-5 h-5 flex-shrink-0" />
                 {sidebarOpen && <span className="font-medium">{item.label}</span>}
-                {item.badge !== undefined && Number(item.badge) > 0 && (
-                  <span className="ml-auto bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center">
-                    {item.badge > 99 ? '99+' : item.badge}
-                  </span>
-                )}
-                {!sidebarOpen && item.badge !== undefined && Number(item.badge) > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
-                    {item.badge > 99 ? '99+' : item.badge}
-                  </span>
+                {/* Badge - Show when count > 0 */}
+                {item.badge !== undefined && item.badge !== null && Number(item.badge) > 0 && (
+                  <>
+                    {sidebarOpen ? (
+                      <span className="ml-auto bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center shadow-md z-10">
+                        {Number(item.badge) > 99 ? '99+' : Number(item.badge)}
+                      </span>
+                    ) : (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-md border-2 border-white dark:border-gray-800 z-10">
+                        {Number(item.badge) > 99 ? '99+' : Number(item.badge)}
+                      </span>
+                    )}
+                  </>
                 )}
               </NavLink>
             ))}
