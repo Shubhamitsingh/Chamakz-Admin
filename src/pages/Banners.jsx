@@ -22,23 +22,14 @@ const Banners = () => {
   const [filterStatus, setFilterStatus] = useState('all') // 'all', 'active', 'inactive'
   const [sortBy, setSortBy] = useState('priority') // 'priority', 'date', 'views', 'clicks'
   
-  // Form state
+  // Form state - Simplified for profile screen only
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     image: '',
     imageUrl: '',
-    priority: 5,
-    isActive: true,
-    actionType: 'navigate',
-    actionTarget: 'profile_screen', // Fixed to profile screen only
-    targetPage: 'profile_screen', // New field for page targeting
-    startDate: '',
-    endDate: '',
-    targetAudience: 'all', // 'all', 'custom'
-    targetLevel: { min: 1, max: 100 },
-    targetType: 'all', // 'all', 'host', 'audience'
-    targetCountries: []
+    isActive: true, // Always true by default
+    priority: 5
   })
   
   const [selectedImage, setSelectedImage] = useState(null)
@@ -134,17 +125,8 @@ const Banners = () => {
       description: '',
       image: '',
       imageUrl: '',
-      priority: 5,
-      isActive: true,
-      actionType: 'navigate',
-      actionTarget: 'profile_screen', // Fixed to profile screen
-      targetPage: 'profile_screen', // Fixed to profile screen
-      startDate: '',
-      endDate: '',
-      targetAudience: 'all',
-      targetLevel: { min: 1, max: 100 },
-      targetType: 'all',
-      targetCountries: []
+      isActive: true, // Always true by default
+      priority: 5
     })
     setSelectedImage(null)
     setImagePreview(null)
@@ -160,16 +142,7 @@ const Banners = () => {
       image: banner.image || banner.imageUrl || '',
       imageUrl: banner.imageUrl || banner.image || '',
       priority: banner.priority || 5,
-      isActive: banner.isActive !== undefined ? banner.isActive : true,
-      actionType: banner.actionType || 'navigate',
-      actionTarget: banner.actionTarget || banner.target || 'profile_screen', // Default to profile_screen
-      targetPage: banner.targetPage || banner.actionTarget || banner.target || 'profile_screen', // Default to profile_screen
-      startDate: banner.startDate || '',
-      endDate: banner.endDate || '',
-      targetAudience: banner.targetAudience || 'all',
-      targetLevel: banner.targetLevel || { min: 1, max: 100 },
-      targetType: banner.targetType || 'all',
-      targetCountries: banner.targetCountries || []
+      isActive: banner.isActive !== undefined ? banner.isActive : true // Default to true if not set
     })
     setSelectedImage(null)
     setImagePreview(banner.image || banner.imageUrl || null)
@@ -200,6 +173,8 @@ const Banners = () => {
         setUploading(false)
       }
 
+      // Simplified banner data - only for profile screen
+      // Simplified banner data - only for profile screen
       const bannerData = {
         title: formData.title || '',
         description: formData.description || '',
@@ -207,29 +182,27 @@ const Banners = () => {
         imageUrl: imageUrl,
         banner: imageUrl,
         priority: Number(formData.priority) || 5,
-        isActive: formData.isActive,
-        actionType: formData.actionType,
+        targetPage: 'profile_screen', // Always profile_screen
         actionTarget: 'profile_screen', // Always profile_screen
         target: 'profile_screen', // Always profile_screen
-        targetPage: 'profile_screen', // Always profile_screen
-        startDate: formData.startDate || null,
-        endDate: formData.endDate || null,
-        targetAudience: formData.targetAudience,
-        targetLevel: formData.targetLevel,
-        targetType: formData.targetType,
-        targetCountries: formData.targetCountries,
         updatedAt: serverTimestamp(),
         updatedBy: adminUser?.uid || 'admin'
       }
-
+      
       if (modalMode === 'create') {
+        // NEW banners: Always set isActive to true
+        bannerData.isActive = true
         bannerData.createdAt = serverTimestamp()
         bannerData.views = 0
         bannerData.clicks = 0
         bannerData.impressions = 0
+        console.log('✅ Creating NEW banner with isActive: true')
         await addDoc(collection(db, 'banners'), bannerData)
         showToast('Banner created successfully!', 'success')
       } else {
+        // EDIT banners: Use form value, but default to true if not set
+        bannerData.isActive = formData.isActive !== undefined ? formData.isActive : true
+        console.log('✅ Updating banner with isActive:', bannerData.isActive)
         await updateDoc(doc(db, 'banners', selectedBanner.id), bannerData)
         showToast('Banner updated successfully!', 'success')
       }
@@ -600,6 +573,19 @@ const Banners = () => {
             )}
           </div>
 
+          {/* Target Page - Fixed to Profile Screen */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Target Page</label>
+            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <p className="text-sm text-blue-800 dark:text-blue-300 font-medium">
+                📍 Profile Screen
+              </p>
+              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                Banners are displayed only on the Profile Screen in the user app.
+              </p>
+            </div>
+          </div>
+
           {/* Priority */}
           <div>
             <label className="block text-sm font-medium mb-2">
@@ -620,58 +606,7 @@ const Banners = () => {
             </div>
           </div>
 
-          {/* Target Page - Fixed to Profile Screen */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Target Page</label>
-            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-              <p className="text-sm text-blue-800 dark:text-blue-300 font-medium">
-                📍 Profile Screen
-              </p>
-              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                Banners are displayed only on the Profile Screen in the user app.
-              </p>
-            </div>
-            <input
-              type="hidden"
-              value="profile_screen"
-              readOnly
-            />
-          </div>
-
-          {/* Action Type */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Action Type (Optional)</label>
-            <select
-              value={formData.actionType}
-              onChange={(e) => setFormData({ ...formData, actionType: e.target.value })}
-              className="input-field"
-              disabled={saving || uploading}
-            >
-              <option value="navigate">Navigate</option>
-              <option value="url">Open URL</option>
-              <option value="none">No Action</option>
-            </select>
-            <p className="text-xs text-gray-500 mt-1">
-              Optional: What happens when user taps the banner
-            </p>
-          </div>
-
-          {/* Action Target - Only show if action type is URL */}
-          {formData.actionType === 'url' && (
-            <div>
-              <label className="block text-sm font-medium mb-2">Target URL</label>
-              <input
-                type="text"
-                value={formData.actionTarget}
-                onChange={(e) => setFormData({ ...formData, actionTarget: e.target.value })}
-                placeholder="https://example.com"
-                className="input-field"
-                disabled={saving || uploading}
-              />
-            </div>
-          )}
-
-          {/* Status */}
+          {/* Status - Always Active by default */}
           <div>
             <label className="block text-sm font-medium mb-2">Status</label>
             <div className="flex gap-4">
@@ -679,113 +614,29 @@ const Banners = () => {
                 <input
                   type="radio"
                   name="status"
-                  checked={formData.isActive}
+                  checked={formData.isActive === true}
                   onChange={() => setFormData({ ...formData, isActive: true })}
                   className="w-4 h-4"
                   disabled={saving || uploading}
                 />
-                <span>Active</span>
+                <span className="text-green-600 dark:text-green-400 font-medium">Active</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="radio"
                   name="status"
-                  checked={!formData.isActive}
+                  checked={formData.isActive === false}
                   onChange={() => setFormData({ ...formData, isActive: false })}
                   className="w-4 h-4"
                   disabled={saving || uploading}
                 />
-                <span>Inactive</span>
+                <span className="text-gray-600 dark:text-gray-400">Inactive</span>
               </label>
             </div>
+            <p className="text-xs text-gray-500 mt-2">
+              ⚠️ Only Active banners will appear in the user app. New banners are Active by default.
+            </p>
           </div>
-
-          {/* Dates */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Start Date (Optional)</label>
-              <input
-                type="date"
-                value={formData.startDate}
-                onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                className="input-field"
-                disabled={saving || uploading}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">End Date (Optional)</label>
-              <input
-                type="date"
-                value={formData.endDate}
-                onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                className="input-field"
-                disabled={saving || uploading}
-              />
-            </div>
-          </div>
-
-          {/* Target Audience */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Target Audience</label>
-            <select
-              value={formData.targetAudience}
-              onChange={(e) => setFormData({ ...formData, targetAudience: e.target.value })}
-              className="input-field"
-              disabled={saving || uploading}
-            >
-              <option value="all">All Users</option>
-              <option value="custom">Custom</option>
-            </select>
-          </div>
-
-          {/* Custom Target Audience */}
-          {formData.targetAudience === 'custom' && (
-            <div className="space-y-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-              <div>
-                <label className="block text-sm font-medium mb-2">User Level Range</label>
-                <div className="flex gap-2 items-center">
-                  <input
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={formData.targetLevel.min}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      targetLevel: { ...formData.targetLevel, min: parseInt(e.target.value) || 1 }
-                    })}
-                    className="input-field w-20"
-                    disabled={saving || uploading}
-                  />
-                  <span>to</span>
-                  <input
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={formData.targetLevel.max}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      targetLevel: { ...formData.targetLevel, max: parseInt(e.target.value) || 100 }
-                    })}
-                    className="input-field w-20"
-                    disabled={saving || uploading}
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">User Type</label>
-                <select
-                  value={formData.targetType}
-                  onChange={(e) => setFormData({ ...formData, targetType: e.target.value })}
-                  className="input-field"
-                  disabled={saving || uploading}
-                >
-                  <option value="all">All</option>
-                  <option value="host">Host</option>
-                  <option value="audience">Audience</option>
-                </select>
-              </div>
-            </div>
-          )}
 
           {/* Action Buttons */}
           <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
