@@ -19,42 +19,85 @@ const ChamakzTeam = () => {
 
   // Fetch all team messages
   useEffect(() => {
-    // Check if team_messages collection has permission
-    // If no permission, show empty state instead of spamming errors
-    const unsubscribe = onSnapshot(
-      query(collection(db, 'team_messages'), orderBy('createdAt', 'desc')),
-      (snapshot) => {
-        const messagesData = snapshot.docs.map(doc => {
-          const data = doc.data()
-          return {
-            id: doc.id,
-            message: data.message || data.text || '',
-            image: data.image || data.imageUrl || '',
-            sender: data.sender || 'Admin',
-            senderId: data.senderId || 'admin',
-            createdAt: data.createdAt ? (data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt)) : new Date(),
-            ...data
+    console.log('📥 Setting up team_messages listener...')
+    let unsubscribe = null
+    
+    try {
+      unsubscribe = onSnapshot(
+        query(collection(db, 'team_messages'), orderBy('createdAt', 'desc')),
+        (snapshot) => {
+          console.log('📥 Received', snapshot.size, 'messages from team_messages collection')
+          const messagesData = snapshot.docs.map(doc => {
+            const data = doc.data()
+            return {
+              id: doc.id,
+              message: data.message || data.text || '',
+              image: data.image || data.imageUrl || '',
+              sender: data.sender || 'Admin',
+              senderId: data.senderId || 'admin',
+              createdAt: data.createdAt ? (data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt)) : (data.timestamp ? (data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestamp)) : new Date()),
+              ...data
+            }
+          })
+          console.log('📥 Processed', messagesData.length, 'messages')
+          setMessages(messagesData)
+          setLoading(false)
+        },
+        (error) => {
+          console.error('❌ Error fetching team messages:', error)
+          console.error('❌ Error code:', error.code)
+          console.error('❌ Error message:', error.message)
+          
+          if (error.code === 'permission-denied') {
+            console.warn('⚠️ Firebase permission error: Please update Firestore security rules for "team_messages" collection')
+            setMessages([])
+            setLoading(false)
+          } else if (error.code === 'failed-precondition') {
+            // Index missing error - try without orderBy
+            console.warn('⚠️ Index missing for createdAt, trying without orderBy...')
+            unsubscribe = onSnapshot(
+              collection(db, 'team_messages'),
+              (snapshot) => {
+                const messagesData = snapshot.docs.map(doc => {
+                  const data = doc.data()
+                  return {
+                    id: doc.id,
+                    message: data.message || data.text || '',
+                    image: data.image || data.imageUrl || '',
+                    sender: data.sender || 'Admin',
+                    senderId: data.senderId || 'admin',
+                    createdAt: data.createdAt ? (data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt)) : (data.timestamp ? (data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestamp)) : new Date()),
+                    ...data
+                  }
+                }).sort((a, b) => b.createdAt - a.createdAt)
+                setMessages(messagesData)
+                setLoading(false)
+              },
+              (fallbackError) => {
+                console.error('❌ Fallback query also failed:', fallbackError)
+                setMessages([])
+                setLoading(false)
+              }
+            )
+          } else {
+            console.error('Error fetching team messages:', error)
+            showToast('Error loading messages. Please check Firebase permissions.', 'error')
+            setLoading(false)
           }
-        })
-        setMessages(messagesData)
-        setLoading(false)
-      },
-      (error) => {
-        // Only log error once, don't spam console
-        if (error.code === 'permission-denied') {
-          console.warn('⚠️ Firebase permission error: Please update Firestore security rules for "team_messages" collection')
-          // Show empty state instead of error spam
-          setMessages([])
-          setLoading(false)
-        } else {
-          console.error('Error fetching team messages:', error)
-          showToast('Error loading messages. Please check Firebase permissions.', 'error')
-          setLoading(false)
         }
-      }
-    )
+      )
+    } catch (error) {
+      console.error('❌ Error setting up listener:', error)
+      setMessages([])
+      setLoading(false)
+    }
 
-    return () => unsubscribe()
+    return () => {
+      console.log('📥 Unsubscribing from team_messages listener')
+      if (unsubscribe) {
+        unsubscribe()
+      }
+    }
   }, [showToast])
 
   const handleImageChange = (e) => {
@@ -108,7 +151,16 @@ const ChamakzTeam = () => {
       }
 
       // Save message to team_messages collection
-      await addDoc(collection(db, 'team_messages'), {
+      console.log('📤 Attempting to save message to team_messages collection...')
+      console.log('📤 Admin user:', adminUser?.uid)
+      console.log('📤 Message data:', {
+        message: message.trim() || '',
+        image: imageUrl,
+        senderId: adminUser?.uid || 'admin',
+        senderName: 'Chamakz Team'
+      })
+      
+      const messageRef = await addDoc(collection(db, 'team_messages'), {
         message: message.trim() || '',
         image: imageUrl,
         imageUrl: imageUrl,
@@ -121,6 +173,8 @@ const ChamakzTeam = () => {
         createdAt: serverTimestamp(),
         timestamp: serverTimestamp()
       })
+      
+      console.log('✅ Message saved successfully! Document ID:', messageRef.id)
 
       // Reset form
       setMessage('')
@@ -129,8 +183,20 @@ const ChamakzTeam = () => {
       
       showToast('Message sent to all users successfully!', 'success')
     } catch (error) {
-      console.error('Error sending team message:', error)
-      showToast(`Error sending message: ${error.message}`, 'error')
+      console.error('❌ Error sending team message:', error)
+      console.error('❌ Error code:', error.code)
+      console.error('❌ Error message:', error.message)
+      console.error('❌ Full error:', error)
+      
+      // Show detailed error message
+      let errorMsg = `Error sending message: ${error.message}`
+      if (error.code === 'permission-denied') {
+        errorMsg = 'Permission denied! Please check Firebase security rules for "team_messages" collection.'
+      } else if (error.code === 'unavailable') {
+        errorMsg = 'Firebase service unavailable. Please check your internet connection.'
+      }
+      
+      showToast(errorMsg, 'error')
     } finally {
       setSending(false)
       setUploading(false)

@@ -31,7 +31,8 @@ const Banners = () => {
     priority: 5,
     isActive: true,
     actionType: 'navigate',
-    actionTarget: '',
+    actionTarget: 'profile_screen', // Fixed to profile screen only
+    targetPage: 'profile_screen', // New field for page targeting
     startDate: '',
     endDate: '',
     targetAudience: 'all', // 'all', 'custom'
@@ -61,7 +62,8 @@ const Banners = () => {
             priority: data.priority || 5,
             isActive: data.isActive !== undefined ? data.isActive : true,
             actionType: data.actionType || 'navigate',
-            actionTarget: data.actionTarget || data.target || '',
+            actionTarget: data.actionTarget || data.target || data.targetPage || 'profile_screen',
+            targetPage: data.targetPage || data.actionTarget || data.target || 'profile_screen',
             startDate: data.startDate || '',
             endDate: data.endDate || '',
             targetAudience: data.targetAudience || 'all',
@@ -135,7 +137,8 @@ const Banners = () => {
       priority: 5,
       isActive: true,
       actionType: 'navigate',
-      actionTarget: '',
+      actionTarget: 'profile_screen', // Fixed to profile screen
+      targetPage: 'profile_screen', // Fixed to profile screen
       startDate: '',
       endDate: '',
       targetAudience: 'all',
@@ -159,7 +162,8 @@ const Banners = () => {
       priority: banner.priority || 5,
       isActive: banner.isActive !== undefined ? banner.isActive : true,
       actionType: banner.actionType || 'navigate',
-      actionTarget: banner.actionTarget || banner.target || '',
+      actionTarget: banner.actionTarget || banner.target || 'profile_screen', // Default to profile_screen
+      targetPage: banner.targetPage || banner.actionTarget || banner.target || 'profile_screen', // Default to profile_screen
       startDate: banner.startDate || '',
       endDate: banner.endDate || '',
       targetAudience: banner.targetAudience || 'all',
@@ -205,8 +209,9 @@ const Banners = () => {
         priority: Number(formData.priority) || 5,
         isActive: formData.isActive,
         actionType: formData.actionType,
-        actionTarget: formData.actionTarget,
-        target: formData.actionTarget,
+        actionTarget: 'profile_screen', // Always profile_screen
+        target: 'profile_screen', // Always profile_screen
+        targetPage: 'profile_screen', // Always profile_screen
         startDate: formData.startDate || null,
         endDate: formData.endDate || null,
         targetAudience: formData.targetAudience,
@@ -427,6 +432,12 @@ const Banners = () => {
                     </p>
                   )}
                   
+                  <div className="mb-2">
+                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded text-xs font-medium">
+                      📍 Profile Screen
+                    </span>
+                  </div>
+                  
                   <div className="grid grid-cols-2 gap-2 text-xs text-gray-500 mb-3">
                     <div>
                       <span className="font-semibold">Views:</span> {banner.views || 0}
@@ -609,9 +620,27 @@ const Banners = () => {
             </div>
           </div>
 
+          {/* Target Page - Fixed to Profile Screen */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Target Page</label>
+            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <p className="text-sm text-blue-800 dark:text-blue-300 font-medium">
+                📍 Profile Screen
+              </p>
+              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                Banners are displayed only on the Profile Screen in the user app.
+              </p>
+            </div>
+            <input
+              type="hidden"
+              value="profile_screen"
+              readOnly
+            />
+          </div>
+
           {/* Action Type */}
           <div>
-            <label className="block text-sm font-medium mb-2">Action Type</label>
+            <label className="block text-sm font-medium mb-2">Action Type (Optional)</label>
             <select
               value={formData.actionType}
               onChange={(e) => setFormData({ ...formData, actionType: e.target.value })}
@@ -622,19 +651,20 @@ const Banners = () => {
               <option value="url">Open URL</option>
               <option value="none">No Action</option>
             </select>
+            <p className="text-xs text-gray-500 mt-1">
+              Optional: What happens when user taps the banner
+            </p>
           </div>
 
-          {/* Action Target */}
-          {formData.actionType !== 'none' && (
+          {/* Action Target - Only show if action type is URL */}
+          {formData.actionType === 'url' && (
             <div>
-              <label className="block text-sm font-medium mb-2">
-                {formData.actionType === 'navigate' ? 'Target Screen' : 'Target URL'}
-              </label>
+              <label className="block text-sm font-medium mb-2">Target URL</label>
               <input
                 type="text"
                 value={formData.actionTarget}
                 onChange={(e) => setFormData({ ...formData, actionTarget: e.target.value })}
-                placeholder={formData.actionType === 'navigate' ? 'e.g., wallet_screen, profile_screen' : 'https://example.com'}
+                placeholder="https://example.com"
                 className="input-field"
                 disabled={saving || uploading}
               />
