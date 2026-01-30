@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { mockData } from '../utils/mockData'
 import { onAuthChange, logoutAdmin } from '../firebase/auth'
-import { collection, query, where, onSnapshot } from 'firebase/firestore'
+import { collection, query, where, onSnapshot, getDocs, limit, collectionGroup } from 'firebase/firestore'
 import { db } from '../firebase/config'
 
 const AppContext = createContext()
@@ -35,6 +35,15 @@ export const AppProvider = ({ children }) => {
   
   // Unread chat messages count
   const [unreadChatsCount, setUnreadChatsCount] = useState(0)
+  
+  // Pending host applications count
+  const [pendingHostApplicationsCount, setPendingHostApplicationsCount] = useState(0)
+  
+  // Pending withdrawal requests count
+  const [pendingTransactionsCount, setPendingTransactionsCount] = useState(0)
+  
+  // New feedback count
+  const [newFeedbackCount, setNewFeedbackCount] = useState(0)
 
   // Listen to authentication state changes
   useEffect(() => {
@@ -174,6 +183,237 @@ export const AppProvider = ({ children }) => {
     }
   }, [user])
 
+  // Listen to pending host applications count in real-time
+  useEffect(() => {
+    if (!user) {
+      setPendingHostApplicationsCount(0)
+      return
+    }
+
+    console.log('📋 Setting up pending host applications listener...')
+    
+    const getLastSeenApplicationsTime = () => {
+      const saved = localStorage.getItem('hostApplicationsLastSeen')
+      return saved ? new Date(saved) : new Date(0)
+    }
+    
+    // Try different collection names
+    const collectionNames = ['hosts_application', 'host_application', 'host_applications', 'hostApplications']
+    let unsubscribe = null
+
+    const setupListener = async () => {
+      for (const name of collectionNames) {
+        try {
+          const testCollection = collection(db, name)
+          const testSnapshot = await getDocs(query(testCollection, limit(1)))
+          
+          if (testSnapshot.size >= 0) {
+            // Collection exists, set up listener
+            unsubscribe = onSnapshot(
+              collection(db, name),
+              (snapshot) => {
+                const lastSeen = getLastSeenApplicationsTime()
+                
+                // Count only NEW pending applications (created after last visit)
+                const pendingCount = snapshot.docs.filter(doc => {
+                  const data = doc.data()
+                  const status = (data.status || '').toLowerCase()
+                  const isPending = status === 'pending' || status === 'submitted' || status === 'new'
+                  
+                  // Check if application was created after last seen time
+                  const createdAt = data.createdAt || data.created_at || data.submittedAt || data.timestamp
+                  const isNew = createdAt ? createdAt.toDate() > lastSeen : false
+                  
+                  return isPending && isNew
+                }).length
+                
+                setPendingHostApplicationsCount(pendingCount)
+                console.log('📋 New pending host applications:', pendingCount)
+              },
+              (error) => {
+                console.log('Could not fetch host applications count:', error)
+              }
+            )
+            break
+          }
+        } catch (err) {
+          continue
+        }
+      }
+    }
+
+    setupListener()
+
+    return () => {
+      if (unsubscribe) unsubscribe()
+    }
+  }, [user])
+
+  // Listen to pending withdrawal requests count in real-time
+  useEffect(() => {
+    if (!user) {
+      setPendingTransactionsCount(0)
+      return
+    }
+
+    console.log('💰 Setting up pending transactions listener...')
+    const unsubscribe = onSnapshot(
+      collection(db, 'withdrawal_requests'),
+      (snapshot) => {
+        const pendingCount = snapshot.docs.filter(doc => {
+          const data = doc.data()
+          const status = (data.status || '').toLowerCase()
+          return status === 'pending' || status === 'processing'
+        }).length
+        
+        setPendingTransactionsCount(pendingCount)
+        console.log('💰 Pending withdrawal requests:', pendingCount)
+      },
+      (error) => {
+        console.log('Could not fetch withdrawal requests count:', error)
+      }
+    )
+
+    return () => unsubscribe()
+  }, [user])
+
+  // Listen to new feedback count in real-time
+  useEffect(() => {
+    if (!user) {
+      setNewFeedbackCount(0)
+      return
+    }
+
+    console.log('💬 Setting up new feedback listener...')
+    
+    const getLastSeenFeedbackTime = () => {
+      const saved = localStorage.getItem('feedbackLastSeen')
+      return saved ? new Date(saved) : new Date(0)
+    }
+
+    let unsubscribe = null
+    let foundCollection = false
+
+    const setupListener = async () => {
+      const lastSeen = getLastSeenFeedbackTime()
+      
+      // Method 1: Try root collections (same as Feedback page)
+      const rootCollections = ['feedback', 'userFeedback', 'feedbacks', 'user_feedback', 'appFeedback', 'app_feedback', 'reviews', 'userReviews', 'suggestions', 'complaints']
+      
+      for (const name of rootCollections) {
+        try {
+          const testCollection = collection(db, name)
+          const testSnapshot = await getDocs(query(testCollection, limit(1)))
+          
+          if (testSnapshot.size >= 0) {
+            // Collection exists, set up listener
+            console.log(`✅ [Feedback Badge] Found collection: ${name}`)
+            unsubscribe = onSnapshot(
+              collection(db, name),
+              (snapshot) => {
+                const lastSeenTime = getLastSeenFeedbackTime()
+                
+                const newCount = snapshot.docs.filter(doc => {
+                  const data = doc.data()
+                  const status = (data.status || '').toLowerCase()
+                  const isNew = status === 'new' || status === 'unread' || !status
+                  
+                  // Check if created after last visit
+                  const createdAt = data.createdAt || data.created_at || data.timestamp
+                  let isRecent = false
+                  if (createdAt) {
+                    try {
+                      const createdDate = createdAt.toDate ? createdAt.toDate() : new Date(createdAt)
+                      isRecent = createdDate > lastSeenTime
+                    } catch (e) {
+                      // If date parsing fails, consider it new if status is new
+                      isRecent = isNew
+                    }
+                  }
+                  
+                  return isNew || isRecent
+                }).length
+                
+                setNewFeedbackCount(newCount)
+                console.log('💬 New feedback count:', newCount, 'from collection:', name)
+              },
+              (error) => {
+                console.log('Could not fetch feedback count:', error)
+              }
+            )
+            foundCollection = true
+            break
+          }
+        } catch (err) {
+          continue
+        }
+      }
+
+      // Method 2: Try collection groups if root collections not found
+      if (!foundCollection) {
+        console.log('💬 [Feedback Badge] Trying collection groups...')
+        const subCollectionNames = ['feedback', 'userFeedback', 'feedbacks', 'reviews', 'suggestions']
+        
+        for (const name of subCollectionNames) {
+          try {
+            const q = query(collectionGroup(db, name))
+            const testSnapshot = await getDocs(query(q, limit(1)))
+            
+            if (testSnapshot.size >= 0) {
+              console.log(`✅ [Feedback Badge] Found collection group: ${name}`)
+              unsubscribe = onSnapshot(
+                query(collectionGroup(db, name)),
+                (snapshot) => {
+                  const lastSeenTime = getLastSeenFeedbackTime()
+                  
+                  const newCount = snapshot.docs.filter(doc => {
+                    const data = doc.data()
+                    const status = (data.status || '').toLowerCase()
+                    const isNew = status === 'new' || status === 'unread' || !status
+                    
+                    const createdAt = data.createdAt || data.created_at || data.timestamp
+                    let isRecent = false
+                    if (createdAt) {
+                      try {
+                        const createdDate = createdAt.toDate ? createdAt.toDate() : new Date(createdAt)
+                        isRecent = createdDate > lastSeenTime
+                      } catch (e) {
+                        isRecent = isNew
+                      }
+                    }
+                    
+                    return isNew || isRecent
+                  }).length
+                  
+                  setNewFeedbackCount(newCount)
+                  console.log('💬 New feedback count (collection group):', newCount)
+                },
+                (error) => {
+                  console.log('Could not fetch feedback count from collection group:', error)
+                }
+              )
+              foundCollection = true
+              break
+            }
+          } catch (err) {
+            continue
+          }
+        }
+      }
+      
+      if (!foundCollection) {
+        console.log('⚠️ [Feedback Badge] No feedback collection found')
+        setNewFeedbackCount(0)
+      }
+    }
+
+    setupListener()
+
+    return () => {
+      if (unsubscribe) unsubscribe()
+    }
+  }, [user])
+
   useEffect(() => {
     if (darkMode) {
       document.documentElement.classList.add('dark')
@@ -285,6 +525,27 @@ export const AppProvider = ({ children }) => {
     console.log('✅ New users marked as seen')
   }
 
+  const markFeedbackAsSeen = () => {
+    // Save current timestamp as "last seen" time for feedback
+    localStorage.setItem('feedbackLastSeen', new Date().toISOString())
+    setNewFeedbackCount(0) // Reset count immediately
+    console.log('✅ Feedback marked as seen')
+  }
+
+  const markHostApplicationsAsSeen = () => {
+    // Save current timestamp as "last seen" time for host applications
+    localStorage.setItem('hostApplicationsLastSeen', new Date().toISOString())
+    setPendingHostApplicationsCount(0) // Reset count immediately
+    console.log('✅ Host applications marked as seen')
+  }
+
+  const markTransactionsAsSeen = () => {
+    // Save current timestamp as "last seen" time for transactions
+    localStorage.setItem('transactionsLastSeen', new Date().toISOString())
+    setPendingTransactionsCount(0) // Reset count immediately
+    console.log('✅ Transactions marked as seen')
+  }
+
   const value = {
     // Authentication
     user,
@@ -304,6 +565,12 @@ export const AppProvider = ({ children }) => {
     newUsersCount,
     markUsersAsSeen,
     unreadChatsCount,
+    pendingHostApplicationsCount,
+    markHostApplicationsAsSeen,
+    pendingTransactionsCount,
+    markTransactionsAsSeen,
+    newFeedbackCount,
+    markFeedbackAsSeen,
     // Actions
     updateUser,
     updateTicket,

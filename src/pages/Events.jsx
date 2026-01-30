@@ -5,6 +5,7 @@ import Modal from '../components/Modal'
 import SearchBar from '../components/SearchBar'
 import Toast from '../components/Toast'
 import Loader from '../components/Loader'
+import EmptyState from '../components/EmptyState'
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { db, storage } from '../firebase/config'
@@ -469,9 +470,12 @@ const Events = () => {
         className="flex items-center justify-between"
       >
         <div>
-          <h1 className="text-3xl font-bold mb-2">Events Management</h1>
+          <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
+            <Calendar className="w-8 h-8 text-primary-500" />
+            Events
+          </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Manage announcements and events for your app users
+            Manage events, announcements, and promotional campaigns
           </p>
         </div>
         <button
@@ -598,13 +602,13 @@ const Events = () => {
             </motion.div>
           ))}
           {filteredAnnouncements.length === 0 && (
-            <div className="card text-center py-12">
-              <Megaphone className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-              <p className="text-gray-600 dark:text-gray-400">No announcements found</p>
-              <button onClick={handleAddNew} className="btn-primary mt-4">
-                Create First Announcement
-              </button>
-            </div>
+            <EmptyState
+              icon={Megaphone}
+              title="No announcements found"
+              description="Create your first announcement to notify users about important updates, features, or events."
+              actionLabel="Create First Announcement"
+              onAction={handleAddNew}
+            />
           )}
         </div>
       )}
@@ -689,12 +693,14 @@ const Events = () => {
             </motion.div>
           ))}
           {filteredEvents.length === 0 && (
-            <div className="col-span-full card text-center py-12">
-              <Calendar className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-              <p className="text-gray-600 dark:text-gray-400">No events found</p>
-              <button onClick={handleAddNew} className="btn-primary mt-4">
-                Create First Event
-              </button>
+            <div className="col-span-full">
+              <EmptyState
+                icon={Calendar}
+                title="No events found"
+                description="Create your first event to promote special occasions, campaigns, or activities for your users."
+                actionLabel="Create First Event"
+                onAction={handleAddNew}
+              />
             </div>
           )}
         </div>

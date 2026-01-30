@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Users, Ticket, MessageSquare, Key } from 'lucide-react'
+import { Users, Ticket, MessageSquare, Key, LayoutDashboard } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { useApp } from '../context/AppContext'
 import StatCard from '../components/StatCard'
@@ -275,8 +275,11 @@ const Dashboard = () => {
         className="flex items-center justify-between"
       >
         <div>
-          <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
-          <p className="text-gray-600 dark:text-gray-400">Welcome back, Admin! Here's what's happening today.</p>
+          <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
+            <LayoutDashboard className="w-8 h-8 text-primary-500" />
+            Dashboard
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">Overview of your admin panel and key metrics</p>
         </div>
         <div className="text-right">
           <p className="text-sm text-gray-600 dark:text-gray-400">Last updated</p>

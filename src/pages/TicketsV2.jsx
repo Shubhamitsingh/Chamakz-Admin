@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Filter, Eye, CheckCircle, Clock, AlertCircle, Trash2 } from 'lucide-react'
+import { Filter, Eye, CheckCircle, Clock, AlertCircle, Trash2, Ticket } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import SearchBar from '../components/SearchBar'
 import Table from '../components/Table'
 import Modal from '../components/Modal'
 import Loader from '../components/Loader'
+import EmptyState from '../components/EmptyState'
 import { collection, getDocs, getDoc, doc, updateDoc, deleteDoc, query, collectionGroup, serverTimestamp } from 'firebase/firestore'
 import { db } from '../firebase/config'
 
@@ -411,7 +412,10 @@ const TicketsV2 = () => {
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <h1 className="text-3xl font-bold mb-2">Ticket Support</h1>
+        <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
+          <Ticket className="w-8 h-8 text-primary-500" />
+          Tickets / Support
+        </h1>
         <p className="text-gray-600 dark:text-gray-400">Manage and resolve customer support tickets</p>
         {foundIn && (
           <p className="text-sm text-green-600 dark:text-green-400 mt-2">
@@ -520,18 +524,15 @@ const TicketsV2 = () => {
           </h2>
         </div>
         {filteredTickets.length === 0 ? (
-          <div className="text-center py-12">
-            {activeTab === 'in-progress' ? (
-              <Clock className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-            ) : (
-              <CheckCircle className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-            )}
-            <p className="text-gray-600 dark:text-gray-400">
-              {activeTab === 'in-progress' 
-                ? 'No pending tickets. Great job!' 
-                : 'No resolved tickets yet.'}
-            </p>
-          </div>
+          <EmptyState
+            icon={activeTab === 'in-progress' ? Clock : CheckCircle}
+            title={activeTab === 'in-progress' 
+              ? 'No pending tickets' 
+              : 'No resolved tickets'}
+            description={activeTab === 'in-progress' 
+              ? 'Great job! All tickets have been resolved. New support tickets will appear here when users submit them.'
+              : 'Resolved tickets will appear here once you mark tickets as resolved.'}
+          />
         ) : (
           <Table columns={columns} data={filteredTickets} />
         )}

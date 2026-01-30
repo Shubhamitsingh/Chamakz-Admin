@@ -6,6 +6,10 @@ import SearchBar from '../components/SearchBar'
 import Table from '../components/Table'
 import Modal from '../components/Modal'
 import Loader from '../components/Loader'
+import EmptyState from '../components/EmptyState'
+import ErrorState from '../components/ErrorState'
+import Pagination from '../components/Pagination'
+import ExportButton from '../components/ExportButton'
 import { collection, doc, updateDoc, onSnapshot, serverTimestamp } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { fixIncorrectNewUserPermissions } from '../firebase/users'
@@ -24,6 +28,8 @@ const Users = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [fixingPermissions, setFixingPermissions] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(25)
 
   // Manual approval function - Only admin can approve/disapprove users for live streaming
   // Automatic fixing removed to prevent permission errors
@@ -271,6 +277,17 @@ const Users = () => {
     return matchesSearch && matchesStatusFilter && matchesLiveFilter
   })
 
+  // Pagination
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedUsers = filteredUsers.slice(startIndex, endIndex)
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, filterStatus, filterLiveApproval])
+
   // Calculate stats
   const liveApprovalStats = {
     total: users.length,
@@ -278,67 +295,7 @@ const Users = () => {
     notApproved: users.filter(u => u.isActive !== true).length
   }
 
-  // Show loading state
-  if (loading && !error) {
-    return (
-      <div className="space-y-6 p-6">
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <h1 className="text-3xl font-bold mb-2">Users Management</h1>
-          <p className="text-gray-600 dark:text-gray-400">Loading users...</p>
-        </motion.div>
-        <div className="flex items-center justify-center min-h-[400px]">
-          <Loader />
-        </div>
-      </div>
-    )
-  }
-
-  // Show error state
-  if (error) {
-    return (
-      <div className="space-y-6 p-6">
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <h1 className="text-3xl font-bold mb-2">Users Management</h1>
-        </motion.div>
-        <div className="card">
-          <div className="flex flex-col items-center justify-center py-12">
-            <AlertCircle className="w-16 h-16 text-red-500 mb-4" />
-            <h3 className="text-xl font-bold mb-2">Error Loading Users</h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-4 text-center max-w-md">{error}</p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  setError(null)
-                  setLoading(true)
-                  window.location.reload()
-                }}
-                className="btn-primary"
-              >
-                Reload Page
-              </button>
-              <button
-                onClick={() => {
-                  setError(null)
-                  setLoading(true)
-                }}
-                className="btn-secondary"
-              >
-                Try Again
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Define columns
+  // Define columns (must be defined before use in JSX)
   const columns = [
     {
       header: 'Numeric User ID',
@@ -502,6 +459,53 @@ const Users = () => {
     },
   ]
 
+  // Show loading state
+  if (loading && !error) {
+    return (
+      <div className="space-y-6 p-6">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
+            <UsersIcon className="w-8 h-8 text-primary-500" />
+            Users
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">Loading users...</p>
+        </motion.div>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader />
+        </div>
+      </div>
+    )
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="space-y-6 p-6">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
+            <UsersIcon className="w-8 h-8 text-primary-500" />
+            Users
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">Manage user accounts, permissions, and live streaming access</p>
+        </motion.div>
+        <ErrorState
+          error={new Error(error)}
+          context="loading users"
+          onRetry={() => {
+            setError(null)
+            setLoading(true)
+          }}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -511,8 +515,11 @@ const Users = () => {
         className="flex items-center justify-between"
       >
         <div>
-          <h1 className="text-3xl font-bold mb-2">Users Management</h1>
-          <p className="text-gray-600 dark:text-gray-400">Manage all users and their activities</p>
+          <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
+            <UsersIcon className="w-8 h-8 text-primary-500" />
+            Users
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">Manage user accounts, permissions, and live streaming access</p>
         </div>
         <button
           onClick={handleFixIncorrectPermissions}
@@ -584,11 +591,13 @@ const Users = () => {
         className="card"
       >
         <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-          <SearchBar
-            placeholder="Search by name, email, or numeric user ID..."
-            value={searchTerm}
-            onChange={setSearchTerm}
-          />
+          <div className="flex-1">
+            <SearchBar
+              placeholder="Search by name, email, or numeric user ID..."
+              value={searchTerm}
+              onChange={setSearchTerm}
+            />
+          </div>
           <div className="flex gap-2 items-center">
             <Filter className="w-5 h-5 text-gray-500" />
             <select
@@ -609,6 +618,12 @@ const Users = () => {
               <option value="Approved">Live Approved</option>
               <option value="Not Approved">Not Approved</option>
             </select>
+            <ExportButton
+              data={filteredUsers}
+              columns={columns}
+              filename="users"
+              disabled={filteredUsers.length === 0}
+            />
           </div>
         </div>
       </motion.div>
@@ -624,14 +639,32 @@ const Users = () => {
           <h2 className="text-xl font-bold">All Users ({filteredUsers.length})</h2>
         </div>
         {filteredUsers.length === 0 ? (
-          <div className="text-center py-12">
-            <UsersIcon className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-            <p className="text-gray-600 dark:text-gray-400">
-              {users.length === 0 ? 'No users found' : 'No users match your search criteria'}
-            </p>
-          </div>
+          <EmptyState
+            icon={UsersIcon}
+            title={users.length === 0 ? 'No users found' : 'No users match your search criteria'}
+            description={users.length === 0
+              ? 'Users will appear here once they register in the app.'
+              : 'Try adjusting your search or filter settings to find users.'}
+          />
         ) : (
-          <Table columns={columns} data={filteredUsers} />
+          <>
+            <Table columns={columns} data={paginatedUsers} />
+            {totalPages > 1 && (
+              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={filteredUsers.length}
+                  itemsPerPage={itemsPerPage}
+                  onPageChange={setCurrentPage}
+                  onItemsPerPageChange={(newItemsPerPage) => {
+                    setItemsPerPage(newItemsPerPage)
+                    setCurrentPage(1)
+                  }}
+                />
+              </div>
+            )}
+          </>
         )}
       </motion.div>
 

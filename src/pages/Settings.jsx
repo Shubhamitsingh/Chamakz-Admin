@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Save, Upload, Shield, Bell, Palette } from 'lucide-react'
+import { Save, Upload, Shield, Bell, Palette, Settings as SettingsIcon } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore'
 import { updatePassword, updateProfile } from 'firebase/auth'
@@ -190,8 +190,11 @@ const Settings = () => {
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <h1 className="text-3xl font-bold mb-2">Settings</h1>
-        <p className="text-gray-600 dark:text-gray-400">Manage application settings and preferences</p>
+        <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
+          <SettingsIcon className="w-8 h-8 text-primary-500" />
+          Settings
+        </h1>
+        <p className="text-gray-600 dark:text-gray-400">Configure application settings and admin preferences</p>
       </motion.div>
 
       <div className="space-y-6">

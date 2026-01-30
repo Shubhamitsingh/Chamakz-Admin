@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { MessageSquare, Eye, Trash2, Archive, CheckCircle, Clock, Filter } from 'lucide-react'
+import { MessageSquare, Eye, Trash2, Archive, CheckCircle, Clock, Filter, MessageCircle } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import SearchBar from '../components/SearchBar'
 import Table from '../components/Table'
@@ -8,9 +8,10 @@ import Modal from '../components/Modal'
 import Loader from '../components/Loader'
 import { collection, getDocs, getDoc, doc, updateDoc, deleteDoc, query, collectionGroup, serverTimestamp } from 'firebase/firestore'
 import { db } from '../firebase/config'
+import EmptyState from '../components/EmptyState'
 
 const Feedback = () => {
-  const { showToast } = useApp()
+  const { showToast, markFeedbackAsSeen } = useApp()
   const [activeTab, setActiveTab] = useState('new') // 'new' or 'read'
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedFeedback, setSelectedFeedback] = useState(null)
@@ -51,6 +52,10 @@ const Feedback = () => {
               const feedbackData = await processFeedback(snapshot)
               setFeedback(feedbackData)
               setLoading(false)
+              // Mark feedback as seen when page loads
+              if (markFeedbackAsSeen) {
+                markFeedbackAsSeen()
+              }
               return
             }
           } catch (error) {
@@ -78,6 +83,10 @@ const Feedback = () => {
               const feedbackData = await processFeedback(snapshot)
               setFeedback(feedbackData)
               setLoading(false)
+              // Mark feedback as seen when page loads
+              if (markFeedbackAsSeen) {
+                markFeedbackAsSeen()
+              }
               return
             }
           } catch (error) {
@@ -111,6 +120,10 @@ const Feedback = () => {
             const feedbackData = await processFeedback({ docs: allFeedback })
             setFeedback(feedbackData)
             setLoading(false)
+            // Mark feedback as seen when page loads
+            if (markFeedbackAsSeen) {
+              markFeedbackAsSeen()
+            }
             return
           }
         } catch (error) {
@@ -120,6 +133,10 @@ const Feedback = () => {
         console.log('⚠️ No feedback found anywhere')
         setFeedback([])
         setLoading(false)
+        // Mark feedback as seen when page loads (even if no feedback found)
+        if (markFeedbackAsSeen) {
+          markFeedbackAsSeen()
+        }
         
       } catch (error) {
         console.error('Error fetching feedback:', error)
@@ -426,8 +443,11 @@ const Feedback = () => {
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <h1 className="text-3xl font-bold mb-2">User Feedback</h1>
-        <p className="text-gray-600 dark:text-gray-400">View and manage user feedback and suggestions</p>
+        <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
+          <MessageCircle className="w-8 h-8 text-primary-500" />
+          Feedback
+        </h1>
+        <p className="text-gray-600 dark:text-gray-400">Review user feedback, suggestions, and app reviews</p>
         {foundIn && (
           <p className="text-sm text-green-600 dark:text-green-400 mt-2">
             ✅ Feedback loaded from: {foundIn}
@@ -535,18 +555,15 @@ const Feedback = () => {
           </h2>
         </div>
         {filteredFeedback.length === 0 ? (
-          <div className="text-center py-12">
-            {activeTab === 'new' ? (
-              <Clock className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-            ) : (
-              <CheckCircle className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-            )}
-            <p className="text-gray-600 dark:text-gray-400">
-              {activeTab === 'new' 
-                ? 'No new feedback. Great job!' 
-                : 'No read feedback yet.'}
-            </p>
-          </div>
+          <EmptyState
+            icon={activeTab === 'new' ? Clock : CheckCircle}
+            title={activeTab === 'new' 
+              ? 'No new feedback' 
+              : 'No read feedback'}
+            description={activeTab === 'new' 
+              ? 'Great job! All feedback has been reviewed. New feedback from users will appear here.'
+              : 'Read feedback will appear here once you mark feedback as read.'}
+          />
         ) : (
           <Table columns={columns} data={filteredFeedback} />
         )}

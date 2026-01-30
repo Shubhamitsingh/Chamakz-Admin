@@ -14,11 +14,22 @@ import {
   MessageCircle,
   UsersRound,
   Image as BannerIcon,
+  UserCheck,
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 
 const Sidebar = () => {
-  const { sidebarOpen, toggleSidebar, logout, openTicketsCount, newUsersCount, unreadChatsCount } = useApp()
+  const { 
+    sidebarOpen, 
+    toggleSidebar, 
+    logout, 
+    openTicketsCount, 
+    newUsersCount, 
+    unreadChatsCount,
+    pendingHostApplicationsCount,
+    pendingTransactionsCount,
+    newFeedbackCount
+  } = useApp()
   
   // Debug: Log badge count
   useEffect(() => {
@@ -28,12 +39,13 @@ const Sidebar = () => {
   const menuItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/users', icon: Users, label: 'Users', badge: newUsersCount },
-    { path: '/transactions', icon: DollarSign, label: 'Payment' },
-    { path: '/tickets', icon: Ticket, label: 'Tickets / Support', badge: openTicketsCount },
+    { path: '/host-applications', icon: UserCheck, label: 'Host Applications', badge: pendingHostApplicationsCount },
     { path: '/chats', icon: MessageSquare, label: 'Chats', badge: unreadChatsCount },
+    { path: '/tickets', icon: Ticket, label: 'Tickets / Support', badge: openTicketsCount },
+    { path: '/transactions', icon: DollarSign, label: 'Transactions', badge: pendingTransactionsCount },
     { path: '/chamakz-team', icon: UsersRound, label: 'Chamakz Team' },
     { path: '/banners', icon: BannerIcon, label: 'Banners' },
-    { path: '/feedback', icon: MessageCircle, label: 'Feedback' },
+    { path: '/feedback', icon: MessageCircle, label: 'Feedback', badge: newFeedbackCount },
     { path: '/events', icon: Calendar, label: 'Events' },
     { path: '/settings', icon: Settings, label: 'Settings' },
   ]
@@ -47,7 +59,7 @@ const Sidebar = () => {
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="h-16 flex items-center px-4 border-b border-gray-200 dark:border-gray-700">
             <motion.div
               initial={false}
               animate={{ opacity: sidebarOpen ? 1 : 0 }}
@@ -60,14 +72,6 @@ const Sidebar = () => {
               />
               {sidebarOpen && <span className="font-bold text-xl">Chamakz Admin</span>}
             </motion.div>
-            <button
-              onClick={toggleSidebar}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-            >
-              <ChevronLeft
-                className={`w-5 h-5 transition-transform ${!sidebarOpen ? 'rotate-180' : ''}`}
-              />
-            </button>
           </div>
 
           {/* Menu Items */}

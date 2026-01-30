@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Send, Image as ImageIcon, X, Users, MessageSquare, Trash2, AlertTriangle } from 'lucide-react'
+import { Send, Image as ImageIcon, X, Users, MessageSquare, Trash2, AlertTriangle, UsersRound } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import Loader from '../components/Loader'
 import Modal from '../components/Modal'
@@ -262,9 +262,12 @@ const ChamakzTeam = () => {
         className="flex items-center justify-between"
       >
         <div>
-          <h1 className="text-3xl font-bold mb-2">Chamakz Team</h1>
+          <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
+            <UsersRound className="w-8 h-8 text-primary-500" />
+            Chamakz Team
+          </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Send messages to all users with text and images
+            Send announcements and messages to all users
           </p>
         </div>
       </motion.div>

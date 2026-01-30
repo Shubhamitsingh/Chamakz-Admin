@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Plus, Edit2, Trash2, Image as ImageIcon, X, Eye, Filter, Search, CheckCircle, XCircle } from 'lucide-react'
+import { Plus, Edit2, Trash2, Image as ImageIcon, X, Eye, Filter, Search, CheckCircle, XCircle, Image as BannerIcon } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import Modal from '../components/Modal'
 import Loader from '../components/Loader'
@@ -292,9 +292,12 @@ const Banners = () => {
         className="flex items-center justify-between"
       >
         <div>
-          <h1 className="text-3xl font-bold mb-2">Banner Management</h1>
+          <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
+            <BannerIcon className="w-8 h-8 text-primary-500" />
+            Banners
+          </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Create and manage banners for your app
+            Manage promotional banners displayed in the user app
           </p>
         </div>
         <button

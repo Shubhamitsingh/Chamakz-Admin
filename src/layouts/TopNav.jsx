@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Search, Bell, Moon, Sun, Menu, X } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Search, Bell, Moon, Sun, Menu } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
@@ -8,7 +8,7 @@ import { db, auth } from '../firebase/config'
 import { onAuthStateChanged } from 'firebase/auth'
 
 const TopNav = () => {
-  const { darkMode, toggleDarkMode, toggleSidebar, user, newUsersCount, openTicketsCount } = useApp()
+  const { darkMode, toggleDarkMode, toggleSidebar, user, newUsersCount, openTicketsCount, logout } = useApp()
   const navigate = useNavigate()
   const [showNotifications, setShowNotifications] = useState(false)
   const [notifications, setNotifications] = useState([])
@@ -19,6 +19,7 @@ const TopNav = () => {
   const [searching, setSearching] = useState(false)
   const [adminAvatar, setAdminAvatar] = useState(null)
   const [adminName, setAdminName] = useState('Admin User')
+  const notificationDropdownRef = useRef(null)
 
   // Fetch real-time notifications from Firebase
   useEffect(() => {
@@ -257,9 +258,21 @@ const TopNav = () => {
     return `${Math.floor(seconds / 86400)} days ago`
   }
 
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notificationDropdownRef.current && !notificationDropdownRef.current.contains(event.target)) {
+        setShowNotifications(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
   return (
     <nav className="h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-20">
-      <div className="h-full px-4 flex items-center justify-between">
+      <div className="h-full px-6 flex items-center gap-4 w-full">
         {/* Left Side */}
         <div className="flex items-center gap-4 flex-1">
           <button
@@ -282,13 +295,13 @@ const TopNav = () => {
             
             {/* Search Results Dropdown */}
             <AnimatePresence>
-              {showSearchResults && (searchResults.users.length > 0 || searchResults.tickets.length > 0 || searchResults.transactions.length > 0) && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-96 overflow-y-auto"
-                >
+            {showSearchResults && (searchResults.users.length > 0 || searchResults.tickets.length > 0 || searchResults.transactions.length > 0) && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-96 overflow-y-auto"
+              >
                   {searching && (
                     <div className="p-4 text-center text-gray-500">
                       <div className="w-5 h-5 border-2 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
@@ -359,9 +372,9 @@ const TopNav = () => {
                       </div>
                     </>
                   )}
-                </motion.div>
-              )}
-            </AnimatePresence>
+              </motion.div>
+            )}
+          </AnimatePresence>
           </div>
         </div>
 
@@ -376,7 +389,7 @@ const TopNav = () => {
           </button>
 
           {/* Notifications */}
-          <div className="relative">
+          <div className="relative" ref={notificationDropdownRef}>
             <button
               onClick={() => setShowNotifications(!showNotifications)}
               className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors relative"

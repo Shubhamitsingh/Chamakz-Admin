@@ -5,13 +5,17 @@ import SearchBar from '../components/SearchBar'
 import Table from '../components/Table'
 import Modal from '../components/Modal'
 import Loader from '../components/Loader'
+import EmptyState from '../components/EmptyState'
+import ErrorState from '../components/ErrorState'
+import Pagination from '../components/Pagination'
+import ExportButton from '../components/ExportButton'
 import { useApp } from '../context/AppContext'
 import { collection, getDocs, doc, updateDoc, onSnapshot, serverTimestamp } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { db, storage } from '../firebase/config'
 
 const Transactions = () => {
-  const { showToast } = useApp()
+  const { showToast, markTransactionsAsSeen } = useApp()
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [selectedWithdrawal, setSelectedWithdrawal] = useState(null)
@@ -23,6 +27,8 @@ const Transactions = () => {
   const [withdrawals, setWithdrawals] = useState([])
   const [paymentScreenshot, setPaymentScreenshot] = useState(null)
   const [screenshotPreview, setScreenshotPreview] = useState(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(25)
 
   // Fetch withdrawal requests from Firebase
   useEffect(() => {
@@ -113,6 +119,11 @@ const Transactions = () => {
         
         setWithdrawals(withdrawalsData)
         setLoading(false)
+        
+        // Mark transactions as seen when page loads
+        if (markTransactionsAsSeen) {
+          markTransactionsAsSeen()
+        }
       },
       (error) => {
         console.error('❌ [Transactions] ERROR loading withdrawals:', error)
@@ -257,6 +268,17 @@ const Transactions = () => {
     return matchesSearch && w.status === filterStatus
   })
 
+  // Pagination
+  const totalPages = Math.ceil(filteredWithdrawals.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedWithdrawals = filteredWithdrawals.slice(startIndex, endIndex)
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, filterStatus])
+
   const statusCounts = {
     all: withdrawals.length,
     pending: withdrawals.filter(w => w.status === 'pending').length,
@@ -267,6 +289,7 @@ const Transactions = () => {
   const columns = [
     {
       header: 'Request ID',
+      accessor: 'id',
       render: (row) => (
         <span className="font-mono text-xs font-bold text-primary-600 dark:text-primary-400">
           #{row.id.substring(0, 8).toUpperCase()}
@@ -275,6 +298,7 @@ const Transactions = () => {
     },
     {
       header: 'Host',
+      accessor: 'hostName',
       render: (row) => (
         <div>
           <p className="font-medium">{row.hostName}</p>
@@ -367,9 +391,12 @@ const Transactions = () => {
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <h1 className="text-3xl font-bold mb-2">Payment</h1>
+        <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
+          <DollarSign className="w-8 h-8 text-primary-500" />
+          Transactions
+        </h1>
         <p className="text-gray-600 dark:text-gray-400">
-          Manage host withdrawal requests and payments
+          Manage withdrawal requests and payment processing
         </p>
       </motion.div>
 
@@ -437,6 +464,12 @@ const Transactions = () => {
               <option value="paid">Paid</option>
               <option value="rejected">Rejected</option>
             </select>
+            <ExportButton
+              data={filteredWithdrawals}
+              columns={columns}
+              filename="withdrawal_requests"
+              disabled={filteredWithdrawals.length === 0}
+            />
           </div>
         </div>
       </motion.div>
@@ -449,40 +482,34 @@ const Transactions = () => {
           </h2>
         </div>
         {filteredWithdrawals.length === 0 ? (
-          <div className="text-center py-12">
-            <DollarSign className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-            <p className="text-gray-600 dark:text-gray-400 mb-2">
-              {withdrawals.length === 0 
-                ? 'No withdrawal requests yet. Requests will appear here when hosts request withdrawals.' 
-                : 'No requests match your filter.'}
-            </p>
-            {withdrawals.length > 0 && (
-              <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-left max-w-md mx-auto">
-                <p className="text-sm font-semibold mb-2">💡 Debug Info:</p>
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  Total requests: {withdrawals.length}<br/>
-                  Filter: {filterStatus}<br/>
-                  Search term: {searchTerm || '(empty)'}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
-                  Try changing the filter or clearing the search.
-                </p>
-              </div>
-            )}
-            {withdrawals.length === 0 && (
-              <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg text-left max-w-md mx-auto">
-                <p className="text-sm font-semibold mb-2">🔍 Troubleshooting:</p>
-                <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1 list-disc list-inside">
-                  <li>Check Firebase Console for "withdrawal_requests" collection</li>
-                  <li>Verify documents exist in the collection</li>
-                  <li>Check browser console for detailed logs</li>
-                  <li>Verify Firebase rules allow read access</li>
-                </ul>
-              </div>
-            )}
-          </div>
+          <EmptyState
+            icon={DollarSign}
+            title={withdrawals.length === 0 
+              ? 'No withdrawal requests found' 
+              : 'No requests match your search criteria'}
+            description={withdrawals.length === 0 
+              ? 'Withdrawal requests will appear here when hosts request payments from their earnings.'
+              : 'Try adjusting your search or filter settings to find withdrawal requests.'}
+          />
         ) : (
-          <Table columns={columns} data={filteredWithdrawals} />
+          <>
+            <Table columns={columns} data={paginatedWithdrawals} />
+            {totalPages > 1 && (
+              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={filteredWithdrawals.length}
+                  itemsPerPage={itemsPerPage}
+                  onPageChange={setCurrentPage}
+                  onItemsPerPageChange={(newItemsPerPage) => {
+                    setItemsPerPage(newItemsPerPage)
+                    setCurrentPage(1)
+                  }}
+                />
+              </div>
+            )}
+          </>
         )}
       </motion.div>
 
