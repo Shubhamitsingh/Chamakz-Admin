@@ -30,6 +30,7 @@ const Users = () => {
   const [fixingPermissions, setFixingPermissions] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(25)
+  const [activeUsersCount, setActiveUsersCount] = useState(0) // Real-time currently active users (last 5 minutes)
 
   // Manual approval function - Only admin can approve/disapprove users for live streaming
   // Automatic fixing removed to prevent permission errors
@@ -81,7 +82,8 @@ const Users = () => {
                     try {
                       const date = data.lastActive.toDate ? data.lastActive.toDate() : new Date(data.lastActive)
                       if (!isNaN(date.getTime())) {
-                        lastActive = date.toLocaleDateString()
+                        // Store the date object for better formatting
+                        lastActive = date
                       }
                     } catch (e) {
                       console.warn('Date parse error for lastActive:', e)
@@ -96,6 +98,9 @@ const Users = () => {
                   // If isActive field doesn't exist or is false/undefined → user is NOT approved
                   const isActive = data.isActive === true // Only explicitly true means approved
                   
+                  // Get coins - check ucoin first (real user coins), then fallback to coins
+                  const userCoins = Number(data.ucoin) || Number(data.coins) || 0
+                  
                   usersData.push({
                     id: docSnapshot.id,
                     numericUserId: data.numericUserId || 'N/A',
@@ -103,7 +108,7 @@ const Users = () => {
                     email: data.email || 'No email',
                     role: userRole,
                     status: data.blocked ? 'Blocked' : 'Active',
-                    coins: Number(data.coins) || 0,
+                    coins: userCoins,
                     joinDate: joinDate,
                     lastActive: lastActive,
                     phone: data.phone || '',
@@ -121,6 +126,21 @@ const Users = () => {
               
               if (isMounted) {
                 setUsers(usersData)
+                
+                // Calculate currently active users (lastActive within last 5 minutes)
+                const now = new Date()
+                const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000)
+                let activeCount = 0
+                
+                usersData.forEach(user => {
+                  if (user.lastActive && user.lastActive instanceof Date) {
+                    if (user.lastActive >= fiveMinutesAgo) {
+                      activeCount++
+                    }
+                  }
+                })
+                
+                setActiveUsersCount(activeCount)
                 setLoading(false)
                 setError(null)
               }
@@ -405,7 +425,76 @@ const Users = () => {
     { 
       header: 'Last Active', 
       accessor: 'lastActive',
-      render: (row) => row?.lastActive || 'N/A'
+      render: (row) => {
+        if (!row?.lastActive || row.lastActive === 'N/A') {
+          return (
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-gray-400"></span>
+              <span className="text-sm text-gray-500">Never</span>
+            </div>
+          )
+        }
+        
+        // If lastActive is a Date object, format it
+        let lastActiveDate
+        if (row.lastActive instanceof Date) {
+          lastActiveDate = row.lastActive
+        } else if (typeof row.lastActive === 'string') {
+          // If it's already a formatted string, try to parse it
+          try {
+            lastActiveDate = new Date(row.lastActive)
+            if (isNaN(lastActiveDate.getTime())) {
+              return row.lastActive // Return as-is if can't parse
+            }
+          } catch (e) {
+            return row.lastActive // Return as-is if error
+          }
+        } else {
+          return 'N/A'
+        }
+        
+        // Calculate time difference
+        const now = new Date()
+        const diffMs = now - lastActiveDate
+        const diffMins = Math.floor(diffMs / 60000)
+        const diffHours = Math.floor(diffMs / 3600000)
+        const diffDays = Math.floor(diffMs / 86400000)
+        
+        // Determine status and display text
+        let status = 'inactive'
+        let displayText = ''
+        
+        if (diffMins < 5) {
+          status = 'online'
+          displayText = 'Currently Active'
+        } else if (diffMins < 60) {
+          status = 'recent'
+          displayText = `${diffMins} mins ago`
+        } else if (diffHours < 24) {
+          status = 'recent'
+          displayText = `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
+        } else if (diffDays < 7) {
+          status = 'away'
+          displayText = `${diffDays} day${diffDays > 1 ? 's' : ''} ago`
+        } else {
+          status = 'inactive'
+          displayText = `Last seen: ${lastActiveDate.toLocaleDateString()}`
+        }
+        
+        return (
+          <div className="flex items-center gap-2" title={lastActiveDate.toLocaleString()}>
+            <span 
+              className={`w-2 h-2 rounded-full ${
+                status === 'online' ? 'bg-green-500 animate-pulse' :
+                status === 'recent' ? 'bg-yellow-500' :
+                status === 'away' ? 'bg-orange-500' :
+                'bg-gray-400'
+              }`}
+            ></span>
+            <span className="text-sm">{displayText}</span>
+          </div>
+        )
+      }
     },
     {
       header: 'Actions',
@@ -579,7 +668,8 @@ const Users = () => {
           </div>
           <div>
             <p className="text-sm text-gray-600 dark:text-gray-400">Active Users</p>
-            <p className="text-2xl font-bold">{users.filter(u => u.status === 'Active').length}</p>
+            <p className="text-2xl font-bold">{activeUsersCount.toLocaleString()}</p>
+            <p className="text-xs text-gray-500 mt-1">currently using app</p>
           </div>
         </motion.div>
       </div>
@@ -712,7 +802,35 @@ const Users = () => {
               </div>
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Last Active</p>
-                <p className="font-medium">{selectedUser.lastActive || 'N/A'}</p>
+                <div className="flex items-center gap-2">
+                  {selectedUser.lastActive && selectedUser.lastActive !== 'N/A' && selectedUser.lastActive instanceof Date ? (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                      <p className="font-medium">
+                        {(() => {
+                          const now = new Date()
+                          const diffMs = now - selectedUser.lastActive
+                          const diffMins = Math.floor(diffMs / 60000)
+                          const diffHours = Math.floor(diffMs / 3600000)
+                          const diffDays = Math.floor(diffMs / 86400000)
+                          
+                          if (diffMins < 5) return 'Currently Active'
+                          if (diffMins < 60) return `${diffMins} mins ago`
+                          if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
+                          if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`
+                          return `Last seen: ${selectedUser.lastActive.toLocaleDateString()}`
+                        })()}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="font-medium">N/A</p>
+                  )}
+                </div>
+                {selectedUser.lastActive && selectedUser.lastActive instanceof Date && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {selectedUser.lastActive.toLocaleString()}
+                  </p>
+                )}
               </div>
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Live Streaming Approval</p>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Users, Ticket, MessageSquare, Key, LayoutDashboard } from 'lucide-react'
+import { Users, Ticket, MessageSquare, Key, LayoutDashboard, UserCheck } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { useApp } from '../context/AppContext'
 import StatCard from '../components/StatCard'
@@ -15,12 +15,14 @@ const Dashboard = () => {
     totalUsers: 0,
     activeTickets: 0,
     ongoingChats: 0,
-    approvedHosts: 0
+    approvedHosts: 0,
+    activeUsers: 0 // Currently active users (last 5 minutes)
   })
   const [recentActivity, setRecentActivity] = useState([])
   const [chartData, setChartData] = useState({
     userActivity: []
   })
+  const [lastUpdated, setLastUpdated] = useState(null)
 
   // Fetch real statistics from Firebase
   useEffect(() => {
@@ -130,20 +132,66 @@ const Dashboard = () => {
         }
 
         // Fetch recent users as activity
-        const recentUsersQuery = query(
-          collection(db, 'users'),
-          orderBy('createdAt', 'desc'),
-          limit(10)
-        )
-        const recentUsersSnapshot = await getDocs(recentUsersQuery)
+        let recentUsersSnapshot
+        try {
+          // Try to order by createdAt first
+          const recentUsersQuery = query(
+            collection(db, 'users'),
+            orderBy('createdAt', 'desc'),
+            limit(10)
+          )
+          recentUsersSnapshot = await getDocs(recentUsersQuery)
+        } catch (error) {
+          // If createdAt index doesn't exist, fetch all users and sort manually
+          console.log('createdAt index not available, fetching all users:', error)
+          const allUsersSnapshot = await getDocs(collection(db, 'users'))
+          const allUsers = allUsersSnapshot.docs
+            .map(doc => ({ id: doc.id, data: doc.data(), doc }))
+            .filter(item => item.data.createdAt) // Only include users with createdAt
+            .sort((a, b) => {
+              try {
+                const aTime = a.data.createdAt?.toDate ? a.data.createdAt.toDate() : new Date(a.data.createdAt)
+                const bTime = b.data.createdAt?.toDate ? b.data.createdAt.toDate() : new Date(b.data.createdAt)
+                return bTime - aTime
+              } catch (e) {
+                return 0
+              }
+            })
+            .slice(0, 10)
+          
+          // Create a mock snapshot-like object
+          recentUsersSnapshot = {
+            docs: allUsers.map(item => item.doc)
+          }
+        }
         const activities = recentUsersSnapshot.docs.map(doc => {
           const userData = doc.data()
+          
+          // Get user name - match the same logic as Users page
+          const userName = userData.name || userData.displayName || userData.userName || userData.email || 'Unknown User'
+          
+          // Get timestamp - handle both Timestamp and Date objects
+          let timestamp = 'Recently'
+          if (userData.createdAt) {
+            try {
+              if (userData.createdAt.toDate) {
+                timestamp = new Date(userData.createdAt.toDate()).toLocaleString()
+              } else if (userData.createdAt instanceof Date) {
+                timestamp = userData.createdAt.toLocaleString()
+              } else {
+                timestamp = new Date(userData.createdAt).toLocaleString()
+              }
+            } catch (e) {
+              console.warn('Date parse error for createdAt:', e)
+            }
+          }
+          
           return {
             id: doc.id,
-            user: userData.name || userData.email || 'Unknown User',
+            user: userName,
             action: 'New user registered',
             type: 'login',
-            time: userData.createdAt ? new Date(userData.createdAt.toDate()).toLocaleString() : 'Recently'
+            time: timestamp
           }
         })
 
@@ -151,7 +199,8 @@ const Dashboard = () => {
           totalUsers,
           activeTickets,
           ongoingChats,
-          approvedHosts: prevStats.approvedHosts // Keep existing value, will be updated by real-time listener
+          approvedHosts: prevStats.approvedHosts || 0, // Keep existing value, will be updated by real-time listener
+          activeUsers: prevStats.activeUsers || 0 // Keep existing value, will be updated by real-time listener
         }))
         setRecentActivity(activities)
         setChartData({
@@ -165,6 +214,7 @@ const Dashboard = () => {
             { name: 'Sun', users: 0, active: 0 }
           ]
         })
+        setLastUpdated(new Date())
         setLoading(false)
       } catch (error) {
         console.error('Error fetching dashboard data:', error)
@@ -174,6 +224,83 @@ const Dashboard = () => {
     }
 
     fetchDashboardData()
+  }, [])
+
+  // Real-time listener for recent activity (new user registrations)
+  useEffect(() => {
+    let unsubscribe = null
+    let isMounted = true
+    
+    try {
+      const usersCollection = collection(db, 'users')
+      
+      unsubscribe = onSnapshot(
+        usersCollection,
+        (snapshot) => {
+          if (!isMounted) return
+          
+          try {
+            // Get recent users (last 10)
+            const allUsers = []
+            snapshot.forEach((doc) => {
+              const userData = doc.data()
+              if (userData.createdAt) {
+                allUsers.push({
+                  id: doc.id,
+                  data: userData,
+                  createdAt: userData.createdAt?.toDate ? userData.createdAt.toDate() : new Date(userData.createdAt)
+                })
+              }
+            })
+            
+            // Sort by createdAt descending and take top 10
+            allUsers.sort((a, b) => b.createdAt - a.createdAt)
+            const recentUsers = allUsers.slice(0, 10)
+            
+            // Map to activity format
+            const activities = recentUsers.map(item => {
+              const userData = item.data
+              
+              // Get user name - match the same logic as Users page
+              const userName = userData.name || userData.displayName || userData.userName || userData.email || 'Unknown User'
+              
+              // Get timestamp
+              let timestamp = 'Recently'
+              try {
+                timestamp = item.createdAt.toLocaleString()
+              } catch (e) {
+                console.warn('Date parse error:', e)
+              }
+              
+              return {
+                id: item.id,
+                user: userName,
+                action: 'New user registered',
+                type: 'login',
+                time: timestamp
+              }
+            })
+            
+            setRecentActivity(activities)
+            setLastUpdated(new Date())
+          } catch (error) {
+            console.error('Error processing recent activity:', error)
+          }
+        },
+        (error) => {
+          console.error('Error listening to recent activity:', error)
+        }
+      )
+    } catch (error) {
+      console.error('Error setting up recent activity listener:', error)
+    }
+
+    return () => {
+      isMounted = false
+      if (unsubscribe) {
+        unsubscribe()
+      }
+    }
   }, [])
 
   // Real-time listener for approved hosts count
@@ -190,27 +317,45 @@ const Dashboard = () => {
           if (!isMounted) return
           
           let approvedCount = 0
+          let activeUsersCount = 0
+          const now = new Date()
+          const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000) // 5 minutes ago
           
           snapshot.forEach(doc => {
             const userData = doc.data()
+            
             // Count users who are approved for live streaming (isActive === true)
             // This matches the "Live Approved" count in Users page
             if (userData.isActive === true) {
               approvedCount++
             }
+            
+            // Count currently active users (lastActive within last 5 minutes)
+            if (userData.lastActive) {
+              try {
+                const lastActiveDate = userData.lastActive.toDate ? userData.lastActive.toDate() : new Date(userData.lastActive)
+                if (!isNaN(lastActiveDate.getTime()) && lastActiveDate >= fiveMinutesAgo) {
+                  activeUsersCount++
+                }
+              } catch (e) {
+                // Ignore date parsing errors
+              }
+            }
           })
           
           setStats(prevStats => ({
             ...prevStats,
-            approvedHosts: approvedCount
+            approvedHosts: approvedCount,
+            activeUsers: activeUsersCount
           }))
         },
         (error) => {
-          console.error('Error listening to approved hosts count:', error)
+          console.error('Error listening to users count:', error)
           if (isMounted) {
             setStats(prevStats => ({
               ...prevStats,
-              approvedHosts: 0
+              approvedHosts: 0,
+              activeUsers: 0
             }))
           }
         }
@@ -227,6 +372,16 @@ const Dashboard = () => {
     }
   }, [])
 
+  // Helper function to get time ago
+  const getTimeAgo = (date) => {
+    if (!date) return 'Just now'
+    const seconds = Math.floor((new Date() - new Date(date)) / 1000)
+    if (seconds < 60) return 'Just now'
+    if (seconds < 3600) return `${Math.floor(seconds / 60)} mins ago`
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`
+    return `${Math.floor(seconds / 86400)} days ago`
+  }
+
   const statCards = [
     {
       title: 'Total Users',
@@ -234,6 +389,13 @@ const Dashboard = () => {
       icon: Users,
       color: 'primary',
       trend: { positive: true, value: `${stats.totalUsers}`, label: 'registered users' },
+    },
+    {
+      title: 'Active Users',
+      value: (stats.activeUsers || 0).toLocaleString(),
+      icon: UserCheck,
+      color: 'secondary',
+      trend: { positive: true, value: `${stats.activeUsers || 0}`, label: 'currently using app' },
     },
     {
       title: 'Active Tickets',
@@ -253,7 +415,7 @@ const Dashboard = () => {
       title: 'Approved Hosts',
       value: stats.approvedHosts,
       icon: Key,
-      color: 'purple',
+      color: 'pink',
       trend: { positive: true, value: `${stats.approvedHosts}`, label: 'approved hosts' },
     },
   ]
@@ -283,7 +445,9 @@ const Dashboard = () => {
         </div>
         <div className="text-right">
           <p className="text-sm text-gray-600 dark:text-gray-400">Last updated</p>
-          <p className="text-sm font-medium">Just now</p>
+          <p className="text-sm font-medium text-primary-600 dark:text-primary-400">
+            {lastUpdated ? getTimeAgo(lastUpdated) : 'Just now'}
+          </p>
         </div>
       </motion.div>
 

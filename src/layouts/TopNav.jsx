@@ -20,6 +20,7 @@ const TopNav = () => {
   const [adminAvatar, setAdminAvatar] = useState(null)
   const [adminName, setAdminName] = useState('Admin User')
   const notificationDropdownRef = useRef(null)
+  const searchDropdownRef = useRef(null)
 
   // Fetch real-time notifications from Firebase
   useEffect(() => {
@@ -53,28 +54,94 @@ const TopNav = () => {
     )
 
     // Listen to recent users (last 3)
-    const usersUnsubscribe = onSnapshot(
-      query(
-        collection(db, 'users'),
-        orderBy('createdAt', 'desc'),
-        limit(3)
-      ),
-      (snapshot) => {
-        const userNotifs = snapshot.docs.map(doc => {
-          const data = doc.data()
-          const timeAgo = data.createdAt ? getTimeAgo(data.createdAt.toDate()) : 'Recently'
-          return {
-            id: `user-${doc.id}`,
-            text: `New user: ${data.name || data.email || 'Unknown'}`,
-            time: timeAgo,
-            unread: false,
-            type: 'user'
-          }
-        })
-        updateNotifications(userNotifs, 'users')
-      },
-      (error) => console.log('Error fetching user notifications:', error)
-    )
+    let usersUnsubscribe = null
+    try {
+      usersUnsubscribe = onSnapshot(
+        query(
+          collection(db, 'users'),
+          orderBy('createdAt', 'desc'),
+          limit(3)
+        ),
+        (snapshot) => {
+          const userNotifs = snapshot.docs.map(doc => {
+            const data = doc.data()
+            
+            // Get user name - match the same logic as Users page and Dashboard
+            const userName = data.name || data.displayName || data.userName || data.email || 'Unknown'
+            
+            // Get time ago - handle both Timestamp and Date objects
+            let timeAgo = 'Recently'
+            if (data.createdAt) {
+              try {
+                if (data.createdAt.toDate) {
+                  timeAgo = getTimeAgo(data.createdAt.toDate())
+                } else if (data.createdAt instanceof Date) {
+                  timeAgo = getTimeAgo(data.createdAt)
+                } else {
+                  timeAgo = getTimeAgo(new Date(data.createdAt))
+                }
+              } catch (e) {
+                console.warn('Date parse error for notification:', e)
+              }
+            }
+            
+            return {
+              id: `user-${doc.id}`,
+              text: `New user: ${userName}`,
+              time: timeAgo,
+              unread: false,
+              type: 'user'
+            }
+          })
+          updateNotifications(userNotifs, 'users')
+        },
+        (error) => {
+          console.log('Error fetching user notifications (trying fallback):', error)
+          // Fallback: fetch all users and sort manually
+          getDocs(collection(db, 'users')).then(snapshot => {
+            const allUsers = snapshot.docs
+              .map(doc => ({ id: doc.id, data: doc.data(), doc }))
+              .filter(item => item.data.createdAt)
+              .sort((a, b) => {
+                try {
+                  const aTime = a.data.createdAt?.toDate ? a.data.createdAt.toDate() : new Date(a.data.createdAt)
+                  const bTime = b.data.createdAt?.toDate ? b.data.createdAt.toDate() : new Date(b.data.createdAt)
+                  return bTime - aTime
+                } catch (e) {
+                  return 0
+                }
+              })
+              .slice(0, 3)
+            
+            const userNotifs = allUsers.map(item => {
+              const data = item.data
+              const userName = data.name || data.displayName || data.userName || data.email || 'Unknown'
+              
+              let timeAgo = 'Recently'
+              try {
+                const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt)
+                timeAgo = getTimeAgo(createdAt)
+              } catch (e) {
+                console.warn('Date parse error:', e)
+              }
+              
+              return {
+                id: `user-${item.id}`,
+                text: `New user: ${userName}`,
+                time: timeAgo,
+                unread: false,
+                type: 'user'
+              }
+            })
+            updateNotifications(userNotifs, 'users')
+          }).catch(err => {
+            console.error('Error in fallback user notifications:', err)
+          })
+        }
+      )
+    } catch (error) {
+      console.log('Error setting up user notifications listener:', error)
+    }
 
     const allNotifications = {}
     
@@ -88,8 +155,8 @@ const TopNav = () => {
     }
 
     return () => {
-      ticketsUnsubscribe()
-      usersUnsubscribe()
+      if (ticketsUnsubscribe) ticketsUnsubscribe()
+      if (usersUnsubscribe) usersUnsubscribe()
     }
   }, [user])
 
@@ -161,14 +228,16 @@ const TopNav = () => {
           const usersSnapshot = await getDocs(collection(db, 'users'))
           usersSnapshot.forEach(doc => {
             const data = doc.data()
-            const name = (data.name || data.displayName || '').toLowerCase()
+            // Get user name - match the same logic as Users page
+            const userName = data.name || data.displayName || data.userName || ''
+            const name = userName.toLowerCase()
             const email = (data.email || '').toLowerCase()
             const numericId = (data.numericUserId || '').toString()
             
             if (name.includes(searchLower) || email.includes(searchLower) || numericId.includes(searchTerm)) {
               results.users.push({
                 id: doc.id,
-                name: data.name || data.displayName || 'Unknown',
+                name: userName || 'Unknown',
                 email: data.email || '',
                 numericUserId: data.numericUserId || 'N/A',
                 type: 'user'
@@ -200,20 +269,34 @@ const TopNav = () => {
           console.log('Error searching tickets:', error)
         }
 
-        // Search transactions
+        // Search transactions (withdrawal requests)
         try {
-          const transactionsSnapshot = await getDocs(collection(db, 'transactions'))
+          // Try withdrawal_requests collection first (as used in Transactions page)
+          let transactionsSnapshot
+          try {
+            transactionsSnapshot = await getDocs(collection(db, 'withdrawal_requests'))
+          } catch (error) {
+            // Fallback to transactions collection
+            try {
+              transactionsSnapshot = await getDocs(collection(db, 'transactions'))
+            } catch (fallbackError) {
+              console.log('Transactions collection may not exist')
+              transactionsSnapshot = { forEach: () => {} } // Empty snapshot
+            }
+          }
+          
           transactionsSnapshot.forEach(doc => {
             const data = doc.data()
-            const userName = (data.userName || data.userEmail || '').toLowerCase()
-            const reason = (data.reason || '').toLowerCase()
+            const userName = (data.userName || data.userEmail || data.name || '').toLowerCase()
+            const reason = (data.reason || data.description || '').toLowerCase()
+            const amount = (data.amount || '').toString()
             
-            if (userName.includes(searchLower) || reason.includes(searchLower)) {
+            if (userName.includes(searchLower) || reason.includes(searchLower) || amount.includes(searchTerm)) {
               results.transactions.push({
                 id: doc.id,
-                user: data.userName || data.userEmail || 'Unknown',
+                user: data.userName || data.userEmail || data.name || 'Unknown',
                 amount: data.amount || 0,
-                transactionType: data.type || 'Credit',
+                transactionType: data.type || data.status || 'Pending',
                 type: 'transaction'
               })
             }
@@ -244,7 +327,7 @@ const TopNav = () => {
       setSearchTerm('')
       setShowSearchResults(false)
     } else if (result.type === 'transaction') {
-      navigate('/wallet')
+      navigate('/transactions')
       setSearchTerm('')
       setShowSearchResults(false)
     }
@@ -264,6 +347,9 @@ const TopNav = () => {
       if (notificationDropdownRef.current && !notificationDropdownRef.current.contains(event.target)) {
         setShowNotifications(false)
       }
+      if (searchDropdownRef.current && !searchDropdownRef.current.contains(event.target)) {
+        setShowSearchResults(false)
+      }
     }
 
     document.addEventListener('mousedown', handleClickOutside)
@@ -282,7 +368,7 @@ const TopNav = () => {
             <Menu className="w-5 h-5" />
           </button>
           
-          <div className="relative flex-1 max-w-md">
+          <div className="relative flex-1 max-w-md" ref={searchDropdownRef}>
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
@@ -295,7 +381,7 @@ const TopNav = () => {
             
             {/* Search Results Dropdown */}
             <AnimatePresence>
-            {showSearchResults && (searchResults.users.length > 0 || searchResults.tickets.length > 0 || searchResults.transactions.length > 0) && (
+            {showSearchResults && searchTerm.length >= 2 && (
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -311,52 +397,62 @@ const TopNav = () => {
                   
                   {!searching && (
                     <>
-                      {searchResults.users.length > 0 && (
-                        <div className="p-2">
-                          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 px-2 py-1">Users</p>
-                          {searchResults.users.slice(0, 5).map(user => (
-                            <div
-                              key={user.id}
-                              onClick={() => handleSearchResultClick(user)}
-                              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg cursor-pointer"
-                            >
-                              <p className="font-medium text-sm">{user.name}</p>
-                              <p className="text-xs text-gray-500">{user.email}</p>
-                            </div>
-                          ))}
+                      {searchResults.users.length === 0 && searchResults.tickets.length === 0 && searchResults.transactions.length === 0 ? (
+                        <div className="p-8 text-center text-gray-500">
+                          <Search className="w-12 h-12 mx-auto mb-2 text-gray-400" />
+                          <p className="text-sm">No results found</p>
+                          <p className="text-xs text-gray-400 mt-1">Try a different search term</p>
                         </div>
-                      )}
-                      
-                      {searchResults.tickets.length > 0 && (
-                        <div className="p-2 border-t border-gray-200 dark:border-gray-700">
-                          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 px-2 py-1">Tickets</p>
-                          {searchResults.tickets.slice(0, 5).map(ticket => (
-                            <div
-                              key={ticket.id}
-                              onClick={() => handleSearchResultClick(ticket)}
-                              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg cursor-pointer"
-                            >
-                              <p className="font-medium text-sm">{ticket.issue}</p>
-                              <p className="text-xs text-gray-500">By: {ticket.username}</p>
+                      ) : (
+                        <>
+                          {searchResults.users.length > 0 && (
+                            <div className="p-2">
+                              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 px-2 py-1">Users</p>
+                              {searchResults.users.slice(0, 5).map(user => (
+                                <div
+                                  key={user.id}
+                                  onClick={() => handleSearchResultClick(user)}
+                                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg cursor-pointer"
+                                >
+                                  <p className="font-medium text-sm">{user.name}</p>
+                                  <p className="text-xs text-gray-500">{user.email}</p>
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
-                      )}
-                      
-                      {searchResults.transactions.length > 0 && (
-                        <div className="p-2 border-t border-gray-200 dark:border-gray-700">
-                          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 px-2 py-1">Transactions</p>
-                          {searchResults.transactions.slice(0, 5).map(transaction => (
-                            <div
-                              key={transaction.id}
-                              onClick={() => handleSearchResultClick(transaction)}
-                              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg cursor-pointer"
-                            >
-                              <p className="font-medium text-sm">{transaction.user}</p>
-                              <p className="text-xs text-gray-500">{transaction.transactionType}: {transaction.amount} coins</p>
+                          )}
+                          
+                          {searchResults.tickets.length > 0 && (
+                            <div className="p-2 border-t border-gray-200 dark:border-gray-700">
+                              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 px-2 py-1">Tickets</p>
+                              {searchResults.tickets.slice(0, 5).map(ticket => (
+                                <div
+                                  key={ticket.id}
+                                  onClick={() => handleSearchResultClick(ticket)}
+                                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg cursor-pointer"
+                                >
+                                  <p className="font-medium text-sm">{ticket.issue}</p>
+                                  <p className="text-xs text-gray-500">By: {ticket.username}</p>
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
+                          )}
+                          
+                          {searchResults.transactions.length > 0 && (
+                            <div className="p-2 border-t border-gray-200 dark:border-gray-700">
+                              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 px-2 py-1">Transactions</p>
+                              {searchResults.transactions.slice(0, 5).map(transaction => (
+                                <div
+                                  key={transaction.id}
+                                  onClick={() => handleSearchResultClick(transaction)}
+                                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg cursor-pointer"
+                                >
+                                  <p className="font-medium text-sm">{transaction.user}</p>
+                                  <p className="text-xs text-gray-500">{transaction.transactionType}: {transaction.amount} coins</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </>
                       )}
                       
                       <div className="p-2 border-t border-gray-200 dark:border-gray-700">
