@@ -22,6 +22,9 @@ const HostApplications = () => {
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState(null)
   const [collectionName, setCollectionName] = useState(null)
+  const [showApproveConfirm, setShowApproveConfirm] = useState(false)
+  const [showRejectConfirm, setShowRejectConfirm] = useState(false)
+  const [applicationToProcess, setApplicationToProcess] = useState(null)
 
   // Fetch host applications from Firebase
   useEffect(() => {
@@ -146,14 +149,31 @@ const HostApplications = () => {
                   return null
                 }
 
-                // Parse dates safely
+                // Parse dates safely - try multiple field name variations
                 let applicationDate = 'N/A'
                 let reviewedDate = 'N/A'
 
-                if (data.createdAt) {
+                // Try to find application date from various field names
+                const dateField = data.createdAt || data.created_at || data.timestamp || data.appliedDate || data.applied_date || data.date || data.submittedAt || data.submitted_at
+                
+                if (dateField) {
                   try {
-                    const date = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt)
-                    if (!isNaN(date.getTime())) {
+                    let date = null
+                    
+                    // Handle Firestore Timestamp
+                    if (dateField.toDate && typeof dateField.toDate === 'function') {
+                      date = dateField.toDate()
+                    }
+                    // Handle Firestore Timestamp (seconds/nanoseconds)
+                    else if (dateField.seconds) {
+                      date = new Date(dateField.seconds * 1000)
+                    }
+                    // Handle string or number
+                    else {
+                      date = new Date(dateField)
+                    }
+                    
+                    if (date && !isNaN(date.getTime())) {
                       applicationDate = date.toLocaleDateString('en-US', {
                         year: 'numeric',
                         month: 'short',
@@ -161,10 +181,15 @@ const HostApplications = () => {
                         hour: '2-digit',
                         minute: '2-digit'
                       })
+                      console.log(`✅ Parsed application date for ${docSnapshot.id}: ${applicationDate}`)
+                    } else {
+                      console.warn(`⚠️ Invalid date for ${docSnapshot.id}:`, dateField)
                     }
                   } catch (e) {
-                    console.warn('Date parse error for createdAt:', e)
+                    console.warn(`⚠️ Date parse error for ${docSnapshot.id}:`, e, 'Field:', dateField)
                   }
+                } else {
+                  console.warn(`⚠️ No date field found for application ${docSnapshot.id}. Available fields:`, Object.keys(data))
                 }
 
                 if (data.reviewedDate || data.updatedAt) {
@@ -382,13 +407,19 @@ const HostApplications = () => {
 
   // Handle approve application
   const handleApprove = async (applicationId, userId) => {
-    if (!window.confirm('Are you sure you want to approve this host application?')) {
-      return
-    }
+    setApplicationToProcess({ id: applicationId, userId, action: 'approve' })
+    setShowApproveConfirm(true)
+  }
+
+  const confirmApprove = async () => {
+    if (!applicationToProcess) return
 
     setProcessing(true)
+    setShowApproveConfirm(false)
+    
+    const { id: applicationId, userId } = applicationToProcess
     try {
-      const applicationRef = doc(db, 'hosts_application', applicationId)
+      const applicationRef = doc(db, collectionName || 'hosts_application', applicationId)
       
       // Update application status
       await updateDoc(applicationRef, {
@@ -423,23 +454,31 @@ const HostApplications = () => {
       showToast('Host application approved successfully!', 'success')
       setShowApplicationModal(false)
       setSelectedApplication(null)
+      setApplicationToProcess(null)
     } catch (error) {
       console.error('Error approving application:', error)
       showToast(`Error approving application: ${error.message}`, 'error')
     } finally {
       setProcessing(false)
+      setApplicationToProcess(null)
     }
   }
 
   // Handle reject application
   const handleReject = async (applicationId, userId) => {
-    if (!window.confirm('Are you sure you want to reject this host application?')) {
-      return
-    }
+    setApplicationToProcess({ id: applicationId, userId, action: 'reject' })
+    setShowRejectConfirm(true)
+  }
+
+  const confirmReject = async () => {
+    if (!applicationToProcess) return
 
     setProcessing(true)
+    setShowRejectConfirm(false)
+    
+    const { id: applicationId, userId } = applicationToProcess
     try {
-      const applicationRef = doc(db, 'hosts_application', applicationId)
+      const applicationRef = doc(db, collectionName || 'hosts_application', applicationId)
       
       // Update application status
       await updateDoc(applicationRef, {
@@ -470,11 +509,13 @@ const HostApplications = () => {
       showToast('Host application rejected.', 'success')
       setShowApplicationModal(false)
       setSelectedApplication(null)
+      setApplicationToProcess(null)
     } catch (error) {
       console.error('Error rejecting application:', error)
       showToast(`Error rejecting application: ${error.message}`, 'error')
     } finally {
       setProcessing(false)
+      setApplicationToProcess(null)
     }
   }
 
@@ -916,6 +957,114 @@ const HostApplications = () => {
             )}
           </div>
         )}
+      </Modal>
+
+      {/* Approve Confirmation Modal */}
+      <Modal
+        isOpen={showApproveConfirm}
+        onClose={() => {
+          setShowApproveConfirm(false)
+          setApplicationToProcess(null)
+        }}
+        title="Approve Host Application"
+      >
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+            <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-green-800 dark:text-green-300 mb-1">
+                Are you sure you want to approve this host application?
+              </p>
+              <p className="text-sm text-green-700 dark:text-green-400">
+                This will grant the user host privileges and allow them to start hosting on the platform.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <button
+              onClick={() => {
+                setShowApproveConfirm(false)
+                setApplicationToProcess(null)
+              }}
+              className="flex-1 px-4 py-2.5 border-2 border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors font-semibold"
+              disabled={processing}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmApprove}
+              className="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-semibold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={processing}
+            >
+              {processing ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Approving...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="w-5 h-5" />
+                  Approve Application
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Reject Confirmation Modal */}
+      <Modal
+        isOpen={showRejectConfirm}
+        onClose={() => {
+          setShowRejectConfirm(false)
+          setApplicationToProcess(null)
+        }}
+        title="Reject Host Application"
+      >
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+            <XCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-red-800 dark:text-red-300 mb-1">
+                Are you sure you want to reject this host application?
+              </p>
+              <p className="text-sm text-red-700 dark:text-red-400">
+                This action will deny the user host privileges. They can apply again in the future.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <button
+              onClick={() => {
+                setShowRejectConfirm(false)
+                setApplicationToProcess(null)
+              }}
+              className="flex-1 px-4 py-2.5 border-2 border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors font-semibold"
+              disabled={processing}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmReject}
+              className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-semibold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={processing}
+            >
+              {processing ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Rejecting...
+                </>
+              ) : (
+                <>
+                  <XCircle className="w-5 h-5" />
+                  Reject Application
+                </>
+              )}
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   )
