@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Users, Ticket, MessageSquare, Key, LayoutDashboard, UserCheck } from 'lucide-react'
+import { Users, Ticket, Key, LayoutDashboard, UserCheck, Radio, DollarSign, TrendingUp, TrendingDown, Trophy, X } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { useApp } from '../context/AppContext'
 import StatCard from '../components/StatCard'
 import Loader from '../components/Loader'
-import { collection, getDocs, query, where, orderBy, limit, Timestamp, onSnapshot } from 'firebase/firestore'
+import { collection, getDocs, query, where, orderBy, limit, Timestamp, onSnapshot, doc, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore'
 import { db } from '../firebase/config'
 
 const Dashboard = () => {
@@ -23,6 +23,14 @@ const Dashboard = () => {
     userActivity: []
   })
   const [lastUpdated, setLastUpdated] = useState(null)
+  const [liveStreams, setLiveStreams] = useState([])
+  const [stoppingStream, setStoppingStream] = useState(null)
+  const [revenueStats, setRevenueStats] = useState({
+    todayRevenue: 0,
+    coinsPurchasedToday: 0,
+    coinsSpentToday: 0,
+    topEarningHost: { name: 'N/A', amount: 0 }
+  })
 
   // Fetch real statistics from Firebase
   useEffect(() => {
@@ -170,6 +178,9 @@ const Dashboard = () => {
           // Get user name - match the same logic as Users page
           const userName = userData.name || userData.displayName || userData.userName || userData.email || 'Unknown User'
           
+          // Get numeric user ID
+          const numericUserId = userData.numericUserId || userData.numeric_user_id || userData.userNumericId || 'N/A'
+          
           // Get timestamp - handle both Timestamp and Date objects
           let timestamp = 'Recently'
           if (userData.createdAt) {
@@ -189,6 +200,7 @@ const Dashboard = () => {
           return {
             id: doc.id,
             user: userName,
+            numericUserId: numericUserId,
             action: 'New user registered',
             type: 'login',
             time: timestamp
@@ -264,6 +276,9 @@ const Dashboard = () => {
               // Get user name - match the same logic as Users page
               const userName = userData.name || userData.displayName || userData.userName || userData.email || 'Unknown User'
               
+              // Get numeric user ID
+              const numericUserId = userData.numericUserId || userData.numeric_user_id || userData.userNumericId || 'N/A'
+              
               // Get timestamp
               let timestamp = 'Recently'
               try {
@@ -275,6 +290,7 @@ const Dashboard = () => {
               return {
                 id: item.id,
                 user: userName,
+                numericUserId: numericUserId,
                 action: 'New user registered',
                 type: 'login',
                 time: timestamp
@@ -372,6 +388,321 @@ const Dashboard = () => {
     }
   }, [])
 
+  // Real-time listener for live streams
+  useEffect(() => {
+    let unsubscribe = null
+    let isMounted = true
+
+    const fetchLiveStreams = async () => {
+      try {
+        const streams = []
+
+        // Method 1: Check live_streams collection
+        try {
+          const liveStreamsQuery = query(
+            collection(db, 'live_streams'),
+            where('status', '==', 'live')
+          )
+          const liveStreamsSnapshot = await getDocs(liveStreamsQuery)
+          liveStreamsSnapshot.forEach(doc => {
+            const data = doc.data()
+            const startTime = data.startTime || data.start_time || data.createdAt
+            const startDate = startTime?.toDate ? startTime.toDate() : (startTime ? new Date(startTime) : new Date())
+            
+            streams.push({
+              id: doc.id,
+              hostId: data.hostId || data.host_id || data.userId || '',
+              hostName: data.hostName || data.host_name || data.userName || data.name || 'Unknown Host',
+              numericUserId: data.numericUserId || data.numeric_user_id || 'N/A',
+              viewCount: data.viewCount || data.view_count || data.viewers || 0,
+              startTime: startDate,
+              coinsPerMinute: data.coinsPerMinute || data.coins_per_minute || data.coinsPerMin || 0,
+              totalCoinsEarned: data.totalCoinsEarned || data.total_coins_earned || 0,
+              collection: 'live_streams'
+            })
+          })
+        } catch (error) {
+          console.log('live_streams collection not found or error:', error)
+        }
+
+        // Method 2: Check users collection for isLive === true
+        try {
+          const usersQuery = query(
+            collection(db, 'users'),
+            where('isLive', '==', true)
+          )
+          const usersSnapshot = await getDocs(usersQuery)
+          usersSnapshot.forEach(doc => {
+            const data = doc.data()
+            const liveData = data.liveStreamData || data.live_stream_data || {}
+            const startTime = liveData.startTime || liveData.start_time || data.liveStartTime || data.live_start_time
+            const startDate = startTime?.toDate ? startTime.toDate() : (startTime ? new Date(startTime) : new Date())
+            
+            // Only add if not already in streams (avoid duplicates)
+            if (!streams.find(s => s.hostId === doc.id)) {
+              streams.push({
+                id: doc.id,
+                hostId: doc.id,
+                hostName: data.name || data.displayName || data.userName || 'Unknown Host',
+                numericUserId: data.numericUserId || data.numeric_user_id || 'N/A',
+                viewCount: liveData.viewCount || liveData.view_count || liveData.viewers || 0,
+                startTime: startDate,
+                coinsPerMinute: liveData.coinsPerMinute || liveData.coins_per_minute || 0,
+                totalCoinsEarned: liveData.totalCoinsEarned || liveData.total_coins_earned || 0,
+                collection: 'users'
+              })
+            }
+          })
+        } catch (error) {
+          console.log('Error checking users for isLive:', error)
+        }
+
+        // Method 3: Check active_streams collection
+        try {
+          const activeStreamsQuery = query(
+            collection(db, 'active_streams'),
+            where('status', '==', 'live')
+          )
+          const activeStreamsSnapshot = await getDocs(activeStreamsQuery)
+          activeStreamsSnapshot.forEach(doc => {
+            const data = doc.data()
+            const startTime = data.startTime || data.start_time || data.createdAt
+            const startDate = startTime?.toDate ? startTime.toDate() : (startTime ? new Date(startTime) : new Date())
+            
+            if (!streams.find(s => s.id === doc.id)) {
+              streams.push({
+                id: doc.id,
+                hostId: data.hostId || data.host_id || data.userId || '',
+                hostName: data.hostName || data.host_name || data.userName || data.name || 'Unknown Host',
+                numericUserId: data.numericUserId || data.numeric_user_id || 'N/A',
+                viewCount: data.viewCount || data.view_count || data.viewers || 0,
+                startTime: startDate,
+                coinsPerMinute: data.coinsPerMinute || data.coins_per_minute || data.coinsPerMin || 0,
+                totalCoinsEarned: data.totalCoinsEarned || data.total_coins_earned || 0,
+                collection: 'active_streams'
+              })
+            }
+          })
+        } catch (error) {
+          console.log('active_streams collection not found or error:', error)
+        }
+
+        if (isMounted) {
+          setLiveStreams(streams)
+        }
+      } catch (error) {
+        console.error('Error fetching live streams:', error)
+        if (isMounted) {
+          setLiveStreams([])
+        }
+      }
+    }
+
+    // Initial fetch
+    fetchLiveStreams()
+
+    // Set up real-time listener on users collection (for isLive changes)
+    try {
+      unsubscribe = onSnapshot(
+        collection(db, 'users'),
+        () => {
+          fetchLiveStreams()
+        },
+        (error) => {
+          console.error('Error listening to live streams:', error)
+        }
+      )
+    } catch (error) {
+      console.error('Error setting up live streams listener:', error)
+    }
+
+    // Refresh every 10 seconds for view count updates
+    const interval = setInterval(fetchLiveStreams, 10000)
+
+    return () => {
+      isMounted = false
+      if (unsubscribe) {
+        unsubscribe()
+      }
+      clearInterval(interval)
+    }
+  }, [])
+
+  // Calculate stream duration helper
+  const calculateStreamDuration = (startTime) => {
+    if (!startTime) return '0 min'
+    const now = new Date()
+    const start = startTime instanceof Date ? startTime : new Date(startTime)
+    const diffMs = now - start
+    const diffMins = Math.floor(diffMs / 60000)
+    if (diffMins < 1) return 'Just started'
+    if (diffMins < 60) return `${diffMins} min`
+    const hours = Math.floor(diffMins / 60)
+    const mins = diffMins % 60
+    return `${hours}h ${mins}min`
+  }
+
+  // Force stop stream function
+  const handleStopStream = async (stream) => {
+    setStoppingStream(stream.id)
+    try {
+      if (stream.collection === 'users') {
+        // Update user document
+        const userRef = doc(db, 'users', stream.hostId)
+        await updateDoc(userRef, {
+          isLive: false,
+          liveStreamData: null,
+          liveEndedAt: serverTimestamp(),
+          liveEndedBy: 'admin'
+        })
+      } else {
+        // Update stream document
+        const streamRef = doc(db, stream.collection, stream.id)
+        await updateDoc(streamRef, {
+          status: 'ended',
+          endedAt: serverTimestamp(),
+          endedBy: 'admin'
+        })
+        
+        // Also update user if hostId exists
+        if (stream.hostId) {
+          try {
+            const userRef = doc(db, 'users', stream.hostId)
+            await updateDoc(userRef, {
+              isLive: false,
+              liveStreamData: null
+            })
+          } catch (e) {
+            console.log('Could not update user document:', e)
+          }
+        }
+      }
+      
+      showToast('Stream stopped successfully', 'success')
+    } catch (error) {
+      console.error('Error stopping stream:', error)
+      showToast('Error stopping stream', 'error')
+    }
+    setStoppingStream(null)
+  }
+
+  // Fetch revenue analytics
+  useEffect(() => {
+    const fetchRevenueData = async () => {
+      try {
+        const now = new Date()
+        const todayStart = new Date(now.setHours(0, 0, 0, 0))
+        const todayEnd = new Date(now.setHours(23, 59, 59, 999))
+        const todayStartTs = Timestamp.fromDate(todayStart)
+        const todayEndTs = Timestamp.fromDate(todayEnd)
+
+        let todayRevenue = 0
+        let coinsPurchasedToday = 0
+        let coinsSpentToday = 0
+        const hostEarnings = {}
+
+        // Try transactions collection
+        try {
+          const transactionsQuery = query(
+            collection(db, 'transactions'),
+            where('createdAt', '>=', todayStartTs),
+            where('createdAt', '<=', todayEndTs)
+          )
+          const transactionsSnapshot = await getDocs(transactionsQuery)
+          
+          transactionsSnapshot.forEach(doc => {
+            const data = doc.data()
+            const type = (data.type || '').toLowerCase()
+            const amount = Number(data.amount) || 0
+            const value = Number(data.value) || Number(data.amount) || 0
+
+            if (type === 'purchase' || type === 'credit') {
+              todayRevenue += value
+              coinsPurchasedToday += amount
+            } else if (type === 'spend' || type === 'debit') {
+              coinsSpentToday += amount
+            } else if (type === 'earn' || type === 'earning') {
+              const hostId = data.hostId || data.host_id || data.userId || ''
+              if (hostId) {
+                hostEarnings[hostId] = (hostEarnings[hostId] || 0) + amount
+              }
+            }
+          })
+        } catch (error) {
+          console.log('transactions collection not found or error:', error)
+        }
+
+        // Try coin_transactions collection
+        try {
+          const coinTransactionsQuery = query(
+            collection(db, 'coin_transactions'),
+            where('createdAt', '>=', todayStartTs),
+            where('createdAt', '<=', todayEndTs)
+          )
+          const coinTransactionsSnapshot = await getDocs(coinTransactionsQuery)
+          
+          coinTransactionsSnapshot.forEach(doc => {
+            const data = doc.data()
+            const type = (data.type || '').toLowerCase()
+            const amount = Number(data.amount) || 0
+            const value = Number(data.value) || Number(data.amount) || 0
+
+            if (type === 'purchase' || type === 'credit') {
+              todayRevenue += value
+              coinsPurchasedToday += amount
+            } else if (type === 'spend' || type === 'debit') {
+              coinsSpentToday += amount
+            } else if (type === 'earn' || type === 'earning') {
+              const hostId = data.hostId || data.host_id || data.userId || ''
+              if (hostId) {
+                hostEarnings[hostId] = (hostEarnings[hostId] || 0) + amount
+              }
+            }
+          })
+        } catch (error) {
+          console.log('coin_transactions collection not found or error:', error)
+        }
+
+        // Get top earning host
+        let topHost = { name: 'N/A', amount: 0 }
+        if (Object.keys(hostEarnings).length > 0) {
+          const topHostId = Object.keys(hostEarnings).reduce((a, b) => 
+            hostEarnings[a] > hostEarnings[b] ? a : b
+          )
+          try {
+            // Fetch user document directly
+            const { getDoc } = await import('firebase/firestore')
+            const hostRef = doc(db, 'users', topHostId)
+            const hostSnap = await getDoc(hostRef)
+            if (hostSnap.exists()) {
+              const hostData = hostSnap.data()
+              topHost = {
+                name: hostData.name || hostData.displayName || hostData.userName || 'Unknown',
+                amount: hostEarnings[topHostId]
+              }
+            }
+          } catch (e) {
+            console.log('Could not fetch top host data:', e)
+          }
+        }
+
+        setRevenueStats({
+          todayRevenue,
+          coinsPurchasedToday,
+          coinsSpentToday,
+          topEarningHost: topHost
+        })
+      } catch (error) {
+        console.error('Error fetching revenue data:', error)
+      }
+    }
+
+    fetchRevenueData()
+    // Refresh every 5 minutes
+    const interval = setInterval(fetchRevenueData, 5 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [])
+
   // Helper function to get time ago
   const getTimeAgo = (date) => {
     if (!date) return 'Just now'
@@ -403,13 +734,6 @@ const Dashboard = () => {
       icon: Ticket,
       color: 'orange',
       trend: { positive: false, value: `${stats.activeTickets}`, label: 'need attention' },
-    },
-    {
-      title: 'Ongoing Chats',
-      value: stats.ongoingChats,
-      icon: MessageSquare,
-      color: 'purple',
-      trend: { positive: true, value: `${stats.ongoingChats}`, label: 'active chats' },
     },
     {
       title: 'Approved Hosts',
@@ -457,6 +781,105 @@ const Dashboard = () => {
           <StatCard key={index} {...card} delay={index * 0.1} />
         ))}
       </div>
+
+      {/* Live Streaming Panel */}
+      {liveStreams.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="card border-2 border-red-500 dark:border-red-600"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              <span className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
+              LIVE HOSTS ({liveStreams.length})
+            </h2>
+          </div>
+          <div className="space-y-3">
+            {liveStreams.map((stream) => (
+              <div
+                key={stream.id}
+                className="flex items-center justify-between p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800"
+              >
+                <div className="flex-1">
+                  <p className="font-semibold text-lg">{stream.hostName}</p>
+                  <div className="flex flex-wrap gap-4 text-sm text-gray-600 dark:text-gray-400 mt-2">
+                    <span className="flex items-center gap-1">
+                      👁️ <span className="font-medium">{stream.viewCount}</span> viewers
+                    </span>
+                    <span className="flex items-center gap-1">
+                      ⏱️ <span className="font-medium">{calculateStreamDuration(stream.startTime)}</span>
+                    </span>
+                    <span className="flex items-center gap-1">
+                      🪙 <span className="font-medium">{stream.coinsPerMinute}</span> coins/min
+                    </span>
+                    {stream.numericUserId && stream.numericUserId !== 'N/A' && (
+                      <span className="text-xs font-mono text-primary-600 dark:text-primary-400">
+                        ID: {stream.numericUserId}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleStopStream(stream)}
+                  disabled={stoppingStream === stream.id}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  {stoppingStream === stream.id ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Stopping...
+                    </>
+                  ) : (
+                    <>
+                      <X className="w-4 h-4" />
+                      Stop Stream
+                    </>
+                  )}
+                </button>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Revenue Analytics Cards */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.25 }}
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+      >
+        <StatCard
+          title="Today's Revenue"
+          value={`₹${revenueStats.todayRevenue.toLocaleString()}`}
+          icon={DollarSign}
+          color="green"
+          trend={{ positive: true, value: "Today", label: "total revenue" }}
+        />
+        <StatCard
+          title="Coins Purchased"
+          value={revenueStats.coinsPurchasedToday.toLocaleString()}
+          icon={TrendingUp}
+          color="blue"
+          trend={{ positive: true, value: "Today", label: "coins bought" }}
+        />
+        <StatCard
+          title="Coins Spent"
+          value={revenueStats.coinsSpentToday.toLocaleString()}
+          icon={TrendingDown}
+          color="orange"
+          trend={{ positive: false, value: "Today", label: "coins used" }}
+        />
+        <StatCard
+          title="Top Earning Host"
+          value={revenueStats.topEarningHost.name}
+          icon={Trophy}
+          color="purple"
+          trend={{ positive: true, value: `₹${revenueStats.topEarningHost.amount.toLocaleString()}`, label: "today" }}
+        />
+      </motion.div>
 
       {/* Charts */}
       <div className="grid grid-cols-1 gap-6">
@@ -520,7 +943,14 @@ const Dashboard = () => {
               </div>
               <div className="flex-1">
                 <p className="font-medium">{activity.user}</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">{activity.action}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{activity.action}</p>
+                  {activity.numericUserId && activity.numericUserId !== 'N/A' && (
+                    <span className="text-xs font-mono font-bold text-primary-600 dark:text-primary-400">
+                      ID: {activity.numericUserId}
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="text-sm text-gray-500">{activity.time}</div>
             </motion.div>

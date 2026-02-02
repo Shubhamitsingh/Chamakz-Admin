@@ -10,7 +10,7 @@ import ErrorState from '../components/ErrorState'
 import Pagination from '../components/Pagination'
 import ExportButton from '../components/ExportButton'
 import { useApp } from '../context/AppContext'
-import { collection, getDocs, doc, updateDoc, onSnapshot, serverTimestamp } from 'firebase/firestore'
+import { collection, getDocs, doc, updateDoc, onSnapshot, serverTimestamp, getDoc } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { db, storage } from '../firebase/config'
 
@@ -37,7 +37,7 @@ const Transactions = () => {
     
     const unsubscribe = onSnapshot(
       collection(db, 'withdrawal_requests'),
-      (snapshot) => {
+      async (snapshot) => {
         console.log(`✅ [Transactions] Firebase snapshot received: ${snapshot.size} documents`)
         
         if (snapshot.empty) {
@@ -62,18 +62,38 @@ const Transactions = () => {
           })
         }
         
-        const withdrawalsData = snapshot.docs.map((doc, index) => {
-          const data = doc.data()
+        const withdrawalsDataPromises = snapshot.docs.map(async (docSnapshot, index) => {
+          const data = docSnapshot.data()
           const createdAt = data.createdAt || data.created_at || data.timestamp || data.requestDate
           const createdAtDate = createdAt 
             ? (createdAt.toDate ? createdAt.toDate() : (createdAt instanceof Date ? createdAt : new Date(createdAt)))
             : null
           
+          // Get hostId/userId
+          const hostId = data.hostId || data.userId || data.user_id || ''
+          
+          // Get numericUserId - first try from withdrawal data, then fetch from user document
+          let numericUserId = data.numericUserId || data.numeric_user_id || 'N/A'
+          
+          // If numericUserId is not in withdrawal data, fetch from users collection
+          if (numericUserId === 'N/A' && hostId) {
+            try {
+              const userRef = doc(db, 'users', hostId)
+              const userSnap = await getDoc(userRef)
+              if (userSnap.exists()) {
+                const userData = userSnap.data()
+                numericUserId = userData.numericUserId || userData.numeric_user_id || userData.userNumericId || 'N/A'
+              }
+            } catch (error) {
+              console.log('Could not fetch numericUserId from users collection:', error)
+            }
+          }
+          
           const mappedData = {
-            id: doc.id,
+            id: docSnapshot.id,
             hostName: data.hostName || data.userName || data.name || data.host_name || 'Unknown Host',
-            hostId: data.hostId || data.userId || data.user_id || '',
-            numericUserId: data.numericUserId || data.numeric_user_id || data.userId || data.user_id || 'N/A',
+            hostId: hostId,
+            numericUserId: numericUserId,
             coins: data.coins || data.coinsAmount || data.coins_amount || data.amount || 0,
             amount: data.amount || data.withdrawalAmount || data.withdrawal_amount || data.requestedAmount || 0,
             accountNumber: data.accountNumber || data.bankAccount || data.bank_account || data.account_number || 'N/A',
@@ -100,7 +120,11 @@ const Transactions = () => {
           }
           
           return mappedData
-        }).sort((a, b) => {
+        })
+        
+        const withdrawalsData = await Promise.all(withdrawalsDataPromises)
+        
+        const sortedWithdrawals = withdrawalsData.sort((a, b) => {
           const dateA = a.createdAt
           const dateB = b.createdAt
           if (!dateA) return 1
@@ -108,16 +132,16 @@ const Transactions = () => {
           return dateB.getTime() - dateA.getTime()
         })
         
-        console.log(`✅ [Transactions] Successfully mapped ${withdrawalsData.length} withdrawal requests`)
+        console.log(`✅ [Transactions] Successfully mapped ${sortedWithdrawals.length} withdrawal requests`)
         console.log(`📊 [Transactions] Status breakdown:`, {
-          all: withdrawalsData.length,
-          pending: withdrawalsData.filter(w => w.status === 'pending').length,
-          paid: withdrawalsData.filter(w => ['paid', 'approved', 'completed'].includes(w.status)).length,
-          rejected: withdrawalsData.filter(w => w.status === 'rejected').length,
-          other: withdrawalsData.filter(w => !['pending', 'paid', 'approved', 'completed', 'rejected'].includes(w.status)).length
+          all: sortedWithdrawals.length,
+          pending: sortedWithdrawals.filter(w => w.status === 'pending').length,
+          paid: sortedWithdrawals.filter(w => ['paid', 'approved', 'completed'].includes(w.status)).length,
+          rejected: sortedWithdrawals.filter(w => w.status === 'rejected').length,
+          other: sortedWithdrawals.filter(w => !['pending', 'paid', 'approved', 'completed', 'rejected'].includes(w.status)).length
         })
         
-        setWithdrawals(withdrawalsData)
+        setWithdrawals(sortedWithdrawals)
         setLoading(false)
         
         // Mark transactions as seen when page loads

@@ -239,6 +239,30 @@ const TicketsV2 = () => {
     }
   }
 
+  const getCategoryColor = (category) => {
+    const categoryLower = (category || 'general').toLowerCase()
+    switch (categoryLower) {
+      case 'technical':
+      case 'tech':
+        return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+      case 'payment':
+      case 'billing':
+      case 'transaction':
+        return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+      case 'account':
+      case 'profile':
+        return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+      case 'bug':
+      case 'error':
+        return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+      case 'feature':
+      case 'request':
+        return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+      default:
+        return 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400'
+    }
+  }
+
   const handleUpdateStatus = async (ticketId, newStatus) => {
     setProcessing(true)
     try {
@@ -300,11 +324,13 @@ const TicketsV2 = () => {
   const currentTabTickets = activeTab === 'in-progress' ? inProgressTickets : resolvedTickets
   
   const filteredTickets = currentTabTickets.filter(ticket => {
+    const searchLower = searchTerm.toLowerCase()
     const matchesSearch = 
-      ticket.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      ticket.ticketId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      ticket.issue.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      ticket.email.toLowerCase().includes(searchTerm.toLowerCase())
+      ticket.username.toLowerCase().includes(searchLower) ||
+      ticket.ticketId.toLowerCase().includes(searchLower) ||
+      ticket.issue.toLowerCase().includes(searchLower) ||
+      ticket.email.toLowerCase().includes(searchLower) ||
+      (ticket.category || 'general').toLowerCase().includes(searchLower)
     
     return matchesSearch
   })
@@ -349,6 +375,15 @@ const TicketsV2 = () => {
           <p className="text-xs text-gray-500 truncate">{row.description}</p>
         </div>
       )
+    },
+    {
+      header: 'Category',
+      accessor: 'category',
+      render: (row) => (
+        <span className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getCategoryColor(row.category)}`}>
+          {row.category || 'General'}
+        </span>
+      ),
     },
     {
       header: 'Status',

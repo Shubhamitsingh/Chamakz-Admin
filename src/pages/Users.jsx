@@ -101,17 +101,20 @@ const Users = () => {
                   // Get coins - check ucoin first (real user coins), then fallback to coins
                   const userCoins = Number(data.ucoin) || Number(data.coins) || 0
                   
+                  // Get phone number - try multiple field name variations
+                  const userPhone = data.phone || data.phoneNumber || data.userPhone || data.user_phone || data.mobile || data.mobileNumber || ''
+                  
                   usersData.push({
                     id: docSnapshot.id,
                     numericUserId: data.numericUserId || 'N/A',
                     name: data.name || data.displayName || data.userName || 'Unknown User',
-                    email: data.email || 'No email',
+                    email: data.email || 'No email', // Keep for backward compatibility
                     role: userRole,
                     status: data.blocked ? 'Blocked' : 'Active',
                     coins: userCoins,
                     joinDate: joinDate,
                     lastActive: lastActive,
-                    phone: data.phone || '',
+                    phone: userPhone || 'No phone',
                     region: data.region || '',
                     isActive: isActive // Live streaming approval: false by default, only admin can approve
                   })
@@ -285,7 +288,7 @@ const Users = () => {
     const searchLower = searchTerm.toLowerCase()
     const matchesSearch = 
       (user.name || '').toLowerCase().includes(searchLower) ||
-      (user.email || '').toLowerCase().includes(searchLower) ||
+      (user.phone || '').toLowerCase().includes(searchLower) ||
       (user.numericUserId || '').toLowerCase().includes(searchLower)
     
     const matchesStatusFilter = filterStatus === 'All' || user.status === filterStatus
@@ -336,7 +339,8 @@ const Users = () => {
       accessor: 'name',
       render: (row) => {
         const name = row?.name || 'Unknown'
-        const email = row?.email || 'No email'
+        const phone = row?.phone || 'No phone'
+        const phoneDisplay = phone !== 'No phone' ? `Ph: ${phone}` : phone
         return (
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-full flex items-center justify-center text-white font-bold">
@@ -344,7 +348,7 @@ const Users = () => {
             </div>
             <div>
               <p className="font-medium">{name}</p>
-              <p className="text-xs text-gray-500">{email}</p>
+              <p className="text-xs text-gray-500">{phoneDisplay}</p>
             </div>
           </div>
         )
@@ -683,7 +687,7 @@ const Users = () => {
         <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
           <div className="flex-1">
             <SearchBar
-              placeholder="Search by name, email, or numeric user ID..."
+              placeholder="Search by name, phone number, or numeric user ID..."
               value={searchTerm}
               onChange={setSearchTerm}
             />
@@ -772,7 +776,11 @@ const Users = () => {
               </div>
               <div>
                 <h3 className="text-2xl font-bold">{selectedUser.name || 'Unknown User'}</h3>
-                <p className="text-gray-600 dark:text-gray-400">{selectedUser.email || 'No email'}</p>
+                <p className="text-gray-600 dark:text-gray-400">
+                  {selectedUser.phone && selectedUser.phone !== 'No phone' 
+                    ? `Ph: ${selectedUser.phone}` 
+                    : 'No phone'}
+                </p>
                 <div className="mt-2 space-y-1">
                   <p className="text-sm font-mono font-bold text-primary-600 dark:text-primary-400">
                     User ID: {selectedUser.numericUserId || 'N/A'}
