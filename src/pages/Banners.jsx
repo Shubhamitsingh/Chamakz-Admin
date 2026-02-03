@@ -516,6 +516,28 @@ const Banners = () => {
           {/* Image Upload */}
           <div>
             <label className="block text-sm font-medium mb-2">Banner Image *</label>
+            
+            {/* Banner Size Guide */}
+            <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <div className="flex items-start gap-2 mb-2">
+                <ImageIcon className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">
+                    📐 Recommended Banner Size
+                  </p>
+                  <div className="text-xs text-blue-700 dark:text-blue-400 space-y-1">
+                    <p className="font-medium">Option 1: Standard quality (recommended)</p>
+                    <ul className="list-disc list-inside space-y-0.5 ml-2">
+                      <li>Width: <span className="font-semibold">1200px</span></li>
+                      <li>Height: <span className="font-semibold">200px</span></li>
+                      <li>Aspect ratio: <span className="font-semibold">6:1</span></li>
+                      <li>File size: <span className="font-semibold">~50–150 KB</span> (optimized)</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
             <div className="flex gap-2 items-center mb-2">
               <label className="cursor-pointer">
                 <input
