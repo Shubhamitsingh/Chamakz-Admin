@@ -639,12 +639,14 @@ const HostApplications = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-8 relative -mt-2">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-            <UserCheck className="w-8 h-8 text-primary-500" />
+            <div className="w-10 h-10 bg-pink-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(-5deg)' }}>
+              <UserCheck className="w-6 h-6 text-white" />
+            </div>
             Host Applications
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">

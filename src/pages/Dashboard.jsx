@@ -5,6 +5,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { useApp } from '../context/AppContext'
 import StatCard from '../components/StatCard'
 import Loader from '../components/Loader'
+import UserAvatar from '../components/UserAvatar'
 import { collection, getDocs, query, where, orderBy, limit, Timestamp, onSnapshot, doc, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore'
 import { db } from '../firebase/config'
 
@@ -20,7 +21,8 @@ const Dashboard = () => {
   })
   const [recentActivity, setRecentActivity] = useState([])
   const [chartData, setChartData] = useState({
-    userActivity: []
+    userActivity: [],
+    revenue: []
   })
   const [lastUpdated, setLastUpdated] = useState(null)
   const [liveStreams, setLiveStreams] = useState([])
@@ -139,6 +141,81 @@ const Dashboard = () => {
           }
         }
 
+        // Fetch revenue data for last 7 days
+        const revenueData = []
+        for (const day of last7Days) {
+          const nextDay = new Date(day.date)
+          nextDay.setDate(nextDay.getDate() + 1)
+          
+          try {
+            const dayStart = Timestamp.fromDate(day.date)
+            const dayEnd = Timestamp.fromDate(nextDay)
+            
+            let dayRevenue = 0
+            let coinsPurchased = 0
+
+            // Try transactions collection
+            try {
+              const transactionsQuery = query(
+                collection(db, 'transactions'),
+                where('createdAt', '>=', dayStart),
+                where('createdAt', '<', dayEnd)
+              )
+              const transactionsSnapshot = await getDocs(transactionsQuery)
+              
+              transactionsSnapshot.forEach(doc => {
+                const data = doc.data()
+                const type = (data.type || '').toLowerCase()
+                const amount = Number(data.amount) || 0
+                const value = Number(data.value) || Number(data.amount) || 0
+
+                if (type === 'purchase' || type === 'credit') {
+                  dayRevenue += value
+                  coinsPurchased += amount
+                }
+              })
+            } catch (error) {
+              console.log('transactions collection error for day:', error)
+            }
+
+            // Try coin_transactions collection
+            try {
+              const coinTransactionsQuery = query(
+                collection(db, 'coin_transactions'),
+                where('createdAt', '>=', dayStart),
+                where('createdAt', '<', dayEnd)
+              )
+              const coinTransactionsSnapshot = await getDocs(coinTransactionsQuery)
+              
+              coinTransactionsSnapshot.forEach(doc => {
+                const data = doc.data()
+                const type = (data.type || '').toLowerCase()
+                const amount = Number(data.amount) || 0
+                const value = Number(data.value) || Number(data.amount) || 0
+
+                if (type === 'purchase' || type === 'credit') {
+                  dayRevenue += value
+                  coinsPurchased += amount
+                }
+              })
+            } catch (error) {
+              console.log('coin_transactions collection error for day:', error)
+            }
+
+            revenueData.push({
+              name: day.name,
+              revenue: Math.round(dayRevenue),
+              coins: coinsPurchased
+            })
+          } catch (error) {
+            revenueData.push({
+              name: day.name,
+              revenue: 0,
+              coins: 0
+            })
+          }
+        }
+
         // Fetch recent users as activity
         let recentUsersSnapshot
         try {
@@ -181,6 +258,9 @@ const Dashboard = () => {
           // Get numeric user ID
           const numericUserId = userData.numericUserId || userData.numeric_user_id || userData.userNumericId || 'N/A'
           
+          // Get phone number - check multiple field names
+          const phone = userData.phone || userData.phoneNumber || userData.userPhone || userData.user_phone || userData.mobile || userData.mobileNumber || null
+          
           // Get timestamp - handle both Timestamp and Date objects
           let timestamp = 'Recently'
           if (userData.createdAt) {
@@ -201,6 +281,7 @@ const Dashboard = () => {
             id: doc.id,
             user: userName,
             numericUserId: numericUserId,
+            phone: phone,
             action: 'New user registered',
             type: 'login',
             time: timestamp
@@ -224,6 +305,15 @@ const Dashboard = () => {
             { name: 'Fri', users: 0, active: 0 },
             { name: 'Sat', users: 0, active: 0 },
             { name: 'Sun', users: 0, active: 0 }
+          ],
+          revenue: revenueData.length > 0 ? revenueData : [
+            { name: 'Mon', revenue: 0, coins: 0 },
+            { name: 'Tue', revenue: 0, coins: 0 },
+            { name: 'Wed', revenue: 0, coins: 0 },
+            { name: 'Thu', revenue: 0, coins: 0 },
+            { name: 'Fri', revenue: 0, coins: 0 },
+            { name: 'Sat', revenue: 0, coins: 0 },
+            { name: 'Sun', revenue: 0, coins: 0 }
           ]
         })
         setLastUpdated(new Date())
@@ -725,7 +815,7 @@ const Dashboard = () => {
       title: 'Active Users',
       value: (stats.activeUsers || 0).toLocaleString(),
       icon: UserCheck,
-      color: 'secondary',
+      color: 'primary',
       trend: { positive: true, value: `${stats.activeUsers || 0}`, label: 'currently using app' },
     },
     {
@@ -739,7 +829,7 @@ const Dashboard = () => {
       title: 'Approved Hosts',
       value: stats.approvedHosts,
       icon: Key,
-      color: 'pink',
+      color: 'primary',
       trend: { positive: true, value: `${stats.approvedHosts}`, label: 'approved hosts' },
     },
   ]
@@ -753,30 +843,39 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 relative -mt-6">
+      {/* 2D Decorative Background Elements */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-5">
+        <div className="absolute top-20 right-20 w-64 h-64 bg-pink-300 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-20 left-20 w-48 h-48 bg-pink-400 rounded-full blur-2xl"></div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-pink-200 rounded-full blur-3xl"></div>
+      </div>
+
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between"
+        className="flex items-center gap-8 relative z-10"
       >
-        <div>
+        <div className="flex-1">
           <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-            <LayoutDashboard className="w-8 h-8 text-primary-500" />
+            <div className="w-10 h-10 bg-pink-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(-5deg)' }}>
+              <LayoutDashboard className="w-6 h-6 text-white" />
+            </div>
             Dashboard
           </h1>
           <p className="text-gray-600 dark:text-gray-400">Overview of your admin panel and key metrics</p>
         </div>
-        <div className="text-right">
+        <div className="text-right flex-shrink-0">
           <p className="text-sm text-gray-600 dark:text-gray-400">Last updated</p>
-          <p className="text-sm font-medium text-primary-600 dark:text-primary-400">
+          <p className="text-sm font-medium text-pink-600 dark:text-pink-400">
             {lastUpdated ? getTimeAgo(lastUpdated) : 'Just now'}
           </p>
         </div>
       </motion.div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
         {statCards.map((card, index) => (
           <StatCard key={index} {...card} delay={index * 0.1} />
         ))}
@@ -788,7 +887,8 @@ const Dashboard = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="card border-2 border-red-500 dark:border-red-600"
+          className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-red-500 dark:border-red-600 relative z-10"
+          style={{ boxShadow: 'none' }}
         >
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold flex items-center gap-2">
@@ -815,7 +915,7 @@ const Dashboard = () => {
                       🪙 <span className="font-medium">{stream.coinsPerMinute}</span> coins/min
                     </span>
                     {stream.numericUserId && stream.numericUserId !== 'N/A' && (
-                      <span className="text-xs font-mono text-primary-600 dark:text-primary-400">
+                      <span className="text-xs font-mono text-pink-600 dark:text-pink-400 bg-pink-50 dark:bg-pink-900/20 px-2 py-0.5 rounded">
                         ID: {stream.numericUserId}
                       </span>
                     )}
@@ -855,14 +955,14 @@ const Dashboard = () => {
           title="Today's Revenue"
           value={`₹${revenueStats.todayRevenue.toLocaleString()}`}
           icon={DollarSign}
-          color="green"
+          color="primary"
           trend={{ positive: true, value: "Today", label: "total revenue" }}
         />
         <StatCard
           title="Coins Purchased"
           value={revenueStats.coinsPurchasedToday.toLocaleString()}
           icon={TrendingUp}
-          color="blue"
+          color="primary"
           trend={{ positive: true, value: "Today", label: "coins bought" }}
         />
         <StatCard
@@ -876,7 +976,7 @@ const Dashboard = () => {
           title="Top Earning Host"
           value={revenueStats.topEarningHost.name}
           icon={Trophy}
-          color="purple"
+          color="primary"
           trend={{ positive: true, value: `₹${revenueStats.topEarningHost.amount.toLocaleString()}`, label: "today" }}
         />
       </motion.div>
@@ -888,18 +988,167 @@ const Dashboard = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="card"
+          className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 relative z-10"
+          style={{ boxShadow: 'none' }}
         >
-          <h2 className="text-xl font-bold mb-4">User Activity (Last 7 Days)</h2>
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+            <div className="w-1 h-6 bg-pink-500 rounded-full"></div>
+            User Activity (Last 7 Days)
+          </h2>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={chartData.userActivity}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Line type="monotone" dataKey="users" stroke="#22c55e" strokeWidth={2} />
-              <Line type="monotone" dataKey="active" stroke="#0ea5e9" strokeWidth={2} />
+              <defs>
+                {/* Green gradient for users line */}
+                <linearGradient id="greenGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#22c55e" stopOpacity={0.3} />
+                  <stop offset="100%" stopColor="#22c55e" stopOpacity={0.05} />
+                </linearGradient>
+                {/* Yellow gradient for active line */}
+                <linearGradient id="yellowGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#eab308" stopOpacity={0.3} />
+                  <stop offset="100%" stopColor="#eab308" stopOpacity={0.05} />
+                </linearGradient>
+                {/* 3D shadow effect */}
+                <filter id="shadow3d">
+                  <feDropShadow dx="2" dy="2" stdDeviation="3" floodOpacity="0.3"/>
+                </filter>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" strokeWidth={1} />
+              <XAxis 
+                dataKey="name" 
+                stroke="#6b7280" 
+                tick={{ fill: '#6b7280', fontSize: 12, fontWeight: 500 }}
+                axisLine={{ stroke: '#d1d5db', strokeWidth: 2 }}
+              />
+              <YAxis 
+                stroke="#6b7280" 
+                tick={{ fill: '#6b7280', fontSize: 12, fontWeight: 500 }}
+                axisLine={{ stroke: '#d1d5db', strokeWidth: 2 }}
+              />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: '#fff', 
+                  border: '2px solid #e5e7eb',
+                  borderRadius: '12px',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                  padding: '12px'
+                }} 
+              />
+              <Legend 
+                wrapperStyle={{ paddingTop: '20px' }}
+                iconType="line"
+              />
+              <Line 
+                type="monotone" 
+                dataKey="users" 
+                stroke="#22c55e" 
+                strokeWidth={2} 
+                dot={{ fill: '#22c55e', r: 5, strokeWidth: 2, stroke: '#fff', filter: 'url(#shadow3d)' }} 
+                activeDot={{ r: 7, stroke: '#22c55e', strokeWidth: 2 }}
+                fill="url(#greenGradient)"
+              />
+              <Line 
+                type="monotone" 
+                dataKey="active" 
+                stroke="#eab308" 
+                strokeWidth={2} 
+                dot={{ fill: '#eab308', r: 5, strokeWidth: 2, stroke: '#fff', filter: 'url(#shadow3d)' }} 
+                activeDot={{ r: 7, stroke: '#eab308', strokeWidth: 2 }}
+                fill="url(#yellowGradient)"
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </motion.div>
+
+        {/* Revenue Chart */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 relative z-10"
+          style={{ boxShadow: 'none' }}
+        >
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+            <div className="w-1 h-6 bg-pink-500 rounded-full"></div>
+            Revenue & Coins Analytics (Last 7 Days)
+          </h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={chartData.revenue}>
+              <defs>
+                {/* Green gradient for revenue line */}
+                <linearGradient id="revenueGreenGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#22c55e" stopOpacity={0.3} />
+                  <stop offset="100%" stopColor="#22c55e" stopOpacity={0.05} />
+                </linearGradient>
+                {/* Yellow gradient for coins line */}
+                <linearGradient id="coinsYellowGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#eab308" stopOpacity={0.3} />
+                  <stop offset="100%" stopColor="#eab308" stopOpacity={0.05} />
+                </linearGradient>
+                {/* 3D shadow effect */}
+                <filter id="revenueShadow3d">
+                  <feDropShadow dx="2" dy="2" stdDeviation="3" floodOpacity="0.3"/>
+                </filter>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" strokeWidth={1} />
+              <XAxis 
+                dataKey="name" 
+                stroke="#6b7280" 
+                tick={{ fill: '#6b7280', fontSize: 12, fontWeight: 500 }}
+                axisLine={{ stroke: '#d1d5db', strokeWidth: 2 }}
+              />
+              <YAxis 
+                stroke="#6b7280" 
+                tick={{ fill: '#6b7280', fontSize: 12, fontWeight: 500 }}
+                axisLine={{ stroke: '#d1d5db', strokeWidth: 2 }}
+                yAxisId="left"
+              />
+              <YAxis 
+                stroke="#6b7280" 
+                tick={{ fill: '#6b7280', fontSize: 12, fontWeight: 500 }}
+                axisLine={{ stroke: '#d1d5db', strokeWidth: 2 }}
+                yAxisId="right"
+                orientation="right"
+              />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: '#fff', 
+                  border: '2px solid #e5e7eb',
+                  borderRadius: '12px',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                  padding: '12px'
+                }}
+                formatter={(value, name) => {
+                  if (name === 'revenue') {
+                    return [`₹${value.toLocaleString()}`, 'Revenue']
+                  }
+                  return [value.toLocaleString(), 'Coins Purchased']
+                }}
+              />
+              <Legend 
+                wrapperStyle={{ paddingTop: '20px' }}
+                iconType="line"
+              />
+              <Line 
+                type="monotone" 
+                dataKey="revenue" 
+                stroke="#22c55e" 
+                strokeWidth={2} 
+                dot={{ fill: '#22c55e', r: 5, strokeWidth: 2, stroke: '#fff', filter: 'url(#revenueShadow3d)' }} 
+                activeDot={{ r: 7, stroke: '#22c55e', strokeWidth: 2 }}
+                fill="url(#revenueGreenGradient)"
+                yAxisId="left"
+              />
+              <Line 
+                type="monotone" 
+                dataKey="coins" 
+                stroke="#eab308" 
+                strokeWidth={2} 
+                dot={{ fill: '#eab308', r: 5, strokeWidth: 2, stroke: '#fff', filter: 'url(#revenueShadow3d)' }} 
+                activeDot={{ r: 7, stroke: '#eab308', strokeWidth: 2 }}
+                fill="url(#coinsYellowGradient)"
+                yAxisId="right"
+              />
             </LineChart>
           </ResponsiveContainer>
         </motion.div>
@@ -910,9 +1159,13 @@ const Dashboard = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5 }}
-        className="card"
+        className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 relative z-10"
+        style={{ boxShadow: 'none' }}
       >
-        <h2 className="text-xl font-bold mb-4">Recent Activity</h2>
+        <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+          <div className="w-1 h-6 bg-primary-500 rounded-full"></div>
+          Recent Activity
+        </h2>
         <div className="space-y-3">
           {recentActivity.length === 0 ? (
             <p className="text-center text-gray-500 py-8">No recent activity yet</p>
@@ -923,30 +1176,44 @@ const Dashboard = () => {
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.5 + index * 0.05 }}
-              className="flex items-center gap-4 p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              className="flex items-center gap-4 p-3 hover:bg-pink-50 dark:hover:bg-pink-900/10 rounded-xl transition-colors border border-transparent hover:border-pink-200 dark:hover:border-pink-800"
             >
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                activity.type === 'purchase' ? 'bg-green-100 text-green-600' :
-                activity.type === 'withdrawal' ? 'bg-red-100 text-red-600' :
-                activity.type === 'login' ? 'bg-blue-100 text-blue-600' :
-                activity.type === 'ticket' ? 'bg-orange-100 text-orange-600' :
-                activity.type === 'security' ? 'bg-red-100 text-red-600' :
-                'bg-purple-100 text-purple-600'
-              }`}>
-                {activity.type === 'purchase' && '💰'}
-                {activity.type === 'withdrawal' && '💸'}
-                {activity.type === 'login' && '🔐'}
-                {activity.type === 'ticket' && '🎫'}
-                {activity.type === 'security' && '🚫'}
-                {activity.type === 'referral' && '👥'}
-                {activity.type === 'update' && '✏️'}
-              </div>
+              {/* Show user avatar for login/new user activities, emoji for others */}
+              {activity.type === 'login' ? (
+                <UserAvatar 
+                  userId={activity.id || activity.numericUserId || activity.user} 
+                  name={activity.user} 
+                  size="md"
+                />
+              ) : (
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl ${
+                  activity.type === 'purchase' ? 'bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400' :
+                  activity.type === 'withdrawal' ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' :
+                  activity.type === 'ticket' ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' :
+                  activity.type === 'security' ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' :
+                  'bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400'
+                }`} style={{ transform: 'rotate(-3deg)' }}>
+                  {activity.type === 'purchase' && '💰'}
+                  {activity.type === 'withdrawal' && '💸'}
+                  {activity.type === 'ticket' && '🎫'}
+                  {activity.type === 'security' && '🚫'}
+                  {activity.type === 'referral' && '👥'}
+                  {activity.type === 'update' && '✏️'}
+                </div>
+              )}
               <div className="flex-1">
-                <p className="font-medium">{activity.user}</p>
-                <div className="flex items-center gap-2 mt-1">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <p className="font-medium text-gray-900 dark:text-gray-100">{activity.user}</p>
+                  {activity.phone && (
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                      Ph: {activity.phone}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
                   <p className="text-sm text-gray-600 dark:text-gray-400">{activity.action}</p>
                   {activity.numericUserId && activity.numericUserId !== 'N/A' && (
-                    <span className="text-xs font-mono font-bold text-primary-600 dark:text-primary-400">
+                    <span className="text-xs font-mono font-bold text-pink-600 dark:text-pink-400 bg-pink-50 dark:bg-pink-900/20 px-2 py-0.5 rounded">
                       ID: {activity.numericUserId}
                     </span>
                   )}

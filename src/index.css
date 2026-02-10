@@ -9,52 +9,65 @@
 }
 
 @layer components {
+  /* 2D Flat Card Style */
   .card {
-    @apply bg-white dark:bg-gray-800 rounded-xl shadow-card border border-gray-100 dark:border-gray-700/50 p-6 transition-all hover:shadow-card-hover;
+    @apply bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-100 dark:border-gray-700 p-6 transition-all;
+    box-shadow: none;
   }
   
+  .card:hover {
+    @apply border-pink-200 dark:border-pink-800;
+    transform: translateY(-2px);
+  }
+  
+  /* 2D Flat Button Styles */
   .btn-primary {
-    @apply bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 
-           text-white font-medium px-5 py-2.5 rounded-lg 
-           transition-all duration-200 shadow-sm hover:shadow-md 
-           active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
+    @apply bg-pink-500 hover:bg-pink-600 
+           text-white font-semibold px-5 py-2.5 rounded-xl 
+           transition-all duration-200 border-2 border-pink-500 hover:border-pink-600
+           active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2;
+    box-shadow: none;
   }
   
   .btn-secondary {
-    @apply bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 
-           text-gray-700 dark:text-gray-200 font-medium px-5 py-2.5 rounded-lg 
-           hover:bg-gray-50 dark:hover:bg-gray-700 
-           transition-all duration-200 shadow-sm hover:shadow-md 
-           active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2;
+    @apply bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 
+           text-gray-700 dark:text-gray-200 font-semibold px-5 py-2.5 rounded-xl 
+           hover:bg-pink-50 dark:hover:bg-pink-900/10 hover:border-pink-300 dark:hover:border-pink-700
+           transition-all duration-200 
+           active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2;
+    box-shadow: none;
   }
   
   .btn-danger {
-    @apply bg-red-500 hover:bg-red-600 text-white font-medium px-5 py-2.5 rounded-lg 
-           transition-all duration-200 shadow-sm hover:shadow-md 
+    @apply bg-red-500 hover:bg-red-600 text-white font-semibold px-5 py-2.5 rounded-xl 
+           transition-all duration-200 border-2 border-red-500 hover:border-red-600
            active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2;
+    box-shadow: none;
   }
   
   .btn-ghost {
-    @apply text-gray-700 dark:text-gray-200 font-medium px-4 py-2 rounded-lg 
-           hover:bg-gray-100 dark:hover:bg-gray-700 
-           transition-all duration-200;
+    @apply text-gray-700 dark:text-gray-200 font-semibold px-4 py-2 rounded-xl 
+           hover:bg-pink-50 dark:hover:bg-pink-900/10 
+           transition-all duration-200 border-2 border-transparent hover:border-pink-200 dark:hover:border-pink-800;
   }
   
+  /* 2D Flat Input Style */
   .input-field {
-    @apply w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 
-           rounded-lg bg-white dark:bg-gray-800 
+    @apply w-full px-4 py-2.5 border-2 border-gray-300 dark:border-gray-600 
+           rounded-xl bg-white dark:bg-gray-800 
            text-gray-900 dark:text-gray-100
            placeholder:text-gray-400 dark:placeholder:text-gray-500
-           focus:ring-2 focus:ring-primary-500 focus:border-transparent 
+           focus:ring-2 focus:ring-pink-500 focus:border-pink-500 
            transition-all duration-200
            disabled:bg-gray-50 dark:disabled:bg-gray-900 
            disabled:text-gray-500 dark:disabled:text-gray-400 
            disabled:cursor-not-allowed;
+    box-shadow: none;
   }
   
   .input-field-error {
     @apply border-red-300 dark:border-red-700 
-           focus:ring-red-500 focus:border-transparent;
+           focus:ring-red-500 focus:border-red-500;
   }
 }
 

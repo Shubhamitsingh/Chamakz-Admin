@@ -390,7 +390,7 @@ const TopNav = () => {
               >
                   {searching && (
                     <div className="p-4 text-center text-gray-500">
-                      <div className="w-5 h-5 border-2 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                      <div className="w-5 h-5 border-2 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
                       <p className="text-sm mt-2">Searching...</p>
                     </div>
                   )}
@@ -545,7 +545,7 @@ const TopNav = () => {
                         <div
                           key={notif.id}
                           className={`p-4 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer ${
-                            notif.unread ? 'bg-primary-50 dark:bg-primary-900/20' : ''
+                            notif.unread ? 'bg-pink-50 dark:bg-pink-900/20' : ''
                           }`}
                         >
                           <div className="flex items-start gap-2">
@@ -563,7 +563,7 @@ const TopNav = () => {
                   </div>
                   <div className="p-2 border-t border-gray-200 dark:border-gray-700">
                     <button 
-                      className="w-full text-center text-sm text-primary-600 dark:text-primary-400 hover:underline py-2"
+                      className="w-full text-center text-sm text-pink-600 dark:text-pink-400 hover:underline py-2"
                       onClick={() => setShowNotifications(false)}
                     >
                       Close
@@ -584,7 +584,7 @@ const TopNav = () => {
               <img 
                 src={adminAvatar} 
                 alt="Admin Avatar" 
-                className="w-10 h-10 rounded-full object-cover border-2 border-primary-500 cursor-pointer"
+                className="w-10 h-10 rounded-full object-cover border-2 border-pink-500 cursor-pointer"
                 onError={() => setAdminAvatar(null)}
               />
             ) : (

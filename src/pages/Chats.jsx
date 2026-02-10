@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Send, Search, Ban, AlertCircle, CheckCircle, Filter, X, ChevronDown, User, Calendar, Clock, ChevronRight, Info, MessageSquare } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import Loader from '../components/Loader'
+import UserAvatar from '../components/UserAvatar'
 import { collection, query, orderBy, limit, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, getDoc } from 'firebase/firestore'
 import { db } from '../firebase/config'
 
@@ -356,7 +357,9 @@ const Chats = () => {
       >
         <div>
           <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-            <MessageSquare className="w-8 h-8 text-primary-500" />
+            <div className="w-10 h-10 bg-pink-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(-5deg)' }}>
+              <MessageSquare className="w-6 h-6 text-white" />
+            </div>
             Chats
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
@@ -438,11 +441,13 @@ const Chats = () => {
                   >
                     <div className="flex items-start gap-3">
                       <div className="relative">
-                        <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 shadow-md">
-                          {chat.avatar}
-                        </div>
+                        <UserAvatar 
+                          userId={chat.userId || chat.id || chat.numericUserId || chat.username} 
+                          name={chat.username} 
+                          size="md"
+                        />
                         {chat.status === 'active' && (
-                          <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></div>
+                          <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full z-10"></div>
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -450,7 +455,7 @@ const Chats = () => {
                           <p className="font-semibold truncate text-sm">{chat.username}</p>
                           <span className="text-xs text-gray-500 flex-shrink-0 ml-2">{chat.time}</span>
                         </div>
-                        <p className="text-xs text-primary-600 dark:text-primary-400 font-mono font-bold mb-1">
+                        <p className="text-xs text-pink-600 dark:text-pink-400 font-mono font-bold mb-1">
                           ID: {chat.numericUserId}
                         </p>
                         <p className="text-sm text-gray-600 dark:text-gray-400 truncate mb-1">{chat.lastMessage}</p>
@@ -475,16 +480,18 @@ const Chats = () => {
                 <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-800">
                   <div className="flex items-center gap-3 flex-1">
                     <div className="relative">
-                      <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-full flex items-center justify-center text-white font-bold shadow-md">
-                        {selectedChat.avatar}
-                      </div>
+                      <UserAvatar 
+                        userId={selectedChat.userId || selectedChat.id || selectedChat.numericUserId || selectedChat.username} 
+                        name={selectedChat.username} 
+                        size="md"
+                      />
                       {selectedChat.status === 'active' && (
-                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></div>
+                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full z-10"></div>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm">{selectedChat.username}</p>
-                      <p className="text-xs text-primary-600 dark:text-primary-400 font-mono font-bold">
+                      <p className="text-xs text-pink-600 dark:text-pink-400 font-mono font-bold">
                         ID: {selectedChat.numericUserId}
                       </p>
                     </div>
@@ -516,7 +523,7 @@ const Chats = () => {
                     <div className="flex items-center justify-center h-full">
                       <div className="text-center">
                         <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-primary-100 to-secondary-100 dark:from-primary-900/30 dark:to-secondary-900/30 rounded-full flex items-center justify-center">
-                          <MessageSquare className="w-10 h-10 text-primary-500" />
+                          <MessageSquare className="w-10 h-10 text-pink-500" />
                         </div>
                         <p className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-1">No messages yet</p>
                         <p className="text-sm text-gray-500">Start the conversation by sending a message below</p>
@@ -634,7 +641,7 @@ const Chats = () => {
               <div className="flex items-center justify-center h-full">
                 <div className="text-center max-w-md">
                   <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-primary-100 to-secondary-100 dark:from-primary-900/30 dark:to-secondary-900/30 rounded-full flex items-center justify-center">
-                    <MessageSquare className="w-12 h-12 text-primary-500" />
+                    <MessageSquare className="w-12 h-12 text-pink-500" />
                   </div>
                   <p className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">No Chat Selected</p>
                   <p className="text-sm text-gray-500 mb-4">Select a conversation from the list to view messages and reply to users</p>
@@ -676,11 +683,15 @@ const Chats = () => {
 
                       <div className="space-y-6">
                         <div className="text-center">
-                          <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg">
-                            {selectedChat.avatar}
+                          <div className="mx-auto mb-4 flex justify-center">
+                            <UserAvatar 
+                              userId={selectedChat.userId || selectedChat.id || selectedChat.numericUserId || selectedChat.username} 
+                              name={selectedChat.username} 
+                              size="lg"
+                            />
                           </div>
                           <p className="font-semibold text-lg">{selectedChat.username}</p>
-                          <p className="text-sm text-primary-600 dark:text-primary-400 font-mono font-bold mt-1">
+                          <p className="text-sm text-pink-600 dark:text-pink-400 font-mono font-bold mt-1">
                             ID: {selectedChat.numericUserId}
                           </p>
                         </div>

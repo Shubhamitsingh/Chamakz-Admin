@@ -471,7 +471,9 @@ const Events = () => {
       >
         <div>
           <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-            <Calendar className="w-8 h-8 text-primary-500" />
+            <div className="w-10 h-10 bg-pink-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(-5deg)' }}>
+              <Calendar className="w-6 h-6 text-white" />
+            </div>
             Events
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
@@ -500,7 +502,7 @@ const Events = () => {
             onClick={() => setActiveTab('announcements')}
             className={`flex items-center gap-2 px-4 py-3 font-medium transition-colors relative ${
               activeTab === 'announcements'
-                ? 'text-primary-600 dark:text-primary-400'
+                ? 'text-pink-600 dark:text-pink-400'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
             }`}
           >
@@ -517,7 +519,7 @@ const Events = () => {
             onClick={() => setActiveTab('events')}
             className={`flex items-center gap-2 px-4 py-3 font-medium transition-colors relative ${
               activeTab === 'events'
-                ? 'text-primary-600 dark:text-primary-400'
+                ? 'text-pink-600 dark:text-pink-400'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
             }`}
           >

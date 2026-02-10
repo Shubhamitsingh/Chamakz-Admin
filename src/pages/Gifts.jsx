@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Plus, Edit2, Trash2, Image as ImageIcon, X, Eye, Filter, Search, CheckCircle, XCircle, Image as BannerIcon } from 'lucide-react'
+import { Plus, Edit2, Trash2, Image as ImageIcon, X, Gift, Sparkles, CheckCircle, XCircle, Filter, Search } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import Modal from '../components/Modal'
 import Loader from '../components/Loader'
@@ -9,26 +9,29 @@ import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, order
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { db, storage } from '../firebase/config'
 
-const Banners = () => {
+const Gifts = () => {
   const { showToast, user: adminUser } = useApp()
-  const [banners, setBanners] = useState([])
+  const [gifts, setGifts] = useState([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [modalMode, setModalMode] = useState('create') // 'create' or 'edit'
-  const [selectedBanner, setSelectedBanner] = useState(null)
+  const [selectedGift, setSelectedGift] = useState(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [bannerToDelete, setBannerToDelete] = useState(null)
+  const [giftToDelete, setGiftToDelete] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all') // 'all', 'active', 'inactive'
-  const [sortBy, setSortBy] = useState('priority') // 'priority', 'date', 'views', 'clicks'
+  const [filterCategory, setFilterCategory] = useState('all') // 'all' or specific category
+  const [sortBy, setSortBy] = useState('priority') // 'priority', 'date', 'name', 'cost'
   
-  // Form state - Simplified for profile screen only
+  // Form state
   const [formData, setFormData] = useState({
-    title: '',
+    name: '',
     description: '',
+    category: 'general',
+    cost: 0,
     image: '',
     imageUrl: '',
-    isActive: true, // Always true by default
+    isActive: true,
     priority: 5
   })
   
@@ -37,48 +40,39 @@ const Banners = () => {
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  // Fetch banners from Firebase
+  // Fetch gifts from Firebase
   useEffect(() => {
     const unsubscribe = onSnapshot(
-      query(collection(db, 'banners'), orderBy('priority', 'desc')),
+      query(collection(db, 'gifts'), orderBy('priority', 'desc')),
       (snapshot) => {
-        const bannersData = snapshot.docs.map(doc => {
+        const giftsData = snapshot.docs.map(doc => {
           const data = doc.data()
           return {
             id: doc.id,
-            title: data.title || '',
+            name: data.name || data.title || '',
             description: data.description || '',
-            image: data.image || data.imageUrl || data.banner || '',
-            imageUrl: data.imageUrl || data.image || data.banner || '',
-            priority: data.priority || 5,
+            category: data.category || 'general',
+            cost: data.cost || data.coins || 0,
+            image: data.image || data.imageUrl || data.asset || '',
+            imageUrl: data.imageUrl || data.image || data.asset || '',
             isActive: data.isActive !== undefined ? data.isActive : true,
-            actionType: data.actionType || 'navigate',
-            actionTarget: data.actionTarget || data.target || data.targetPage || 'profile_screen',
-            targetPage: data.targetPage || data.actionTarget || data.target || 'profile_screen',
-            startDate: data.startDate || '',
-            endDate: data.endDate || '',
-            targetAudience: data.targetAudience || 'all',
-            targetLevel: data.targetLevel || { min: 1, max: 100 },
-            targetType: data.targetType || 'all',
-            targetCountries: data.targetCountries || [],
-            views: data.views || 0,
-            clicks: data.clicks || 0,
-            impressions: data.impressions || 0,
+            priority: data.priority || 5,
+            usageCount: data.usageCount || 0,
             createdAt: data.createdAt ? (data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt)) : new Date(),
             updatedAt: data.updatedAt ? (data.updatedAt.toDate ? data.updatedAt.toDate() : new Date(data.updatedAt)) : new Date(),
             ...data
           }
         })
-        setBanners(bannersData)
+        setGifts(giftsData)
         setLoading(false)
       },
       (error) => {
-        console.error('Error fetching banners:', error)
+        console.error('Error fetching gifts:', error)
         if (error.code === 'permission-denied') {
-          console.warn('⚠️ Firebase permission error: Please update Firestore security rules for "banners" collection')
-          setBanners([])
+          console.warn('⚠️ Firebase permission error: Please update Firestore security rules for "gifts" collection')
+          setGifts([])
         } else {
-          showToast('Error loading banners', 'error')
+          showToast('Error loading gifts', 'error')
         }
         setLoading(false)
       }
@@ -87,16 +81,26 @@ const Banners = () => {
     return () => unsubscribe()
   }, [showToast])
 
+  // Get unique categories from gifts
+  const categories = ['all', ...new Set(gifts.map(g => g.category).filter(Boolean))]
+
   const handleImageChange = (e) => {
     const file = e.target.files[0]
     if (file) {
-      if (!file.type.startsWith('image/')) {
-        showToast('Please select an image file', 'error')
+      // Check if it's an image or animation file
+      const isValidFile = file.type.startsWith('image/') || 
+                          file.type === 'video/mp4' || 
+                          file.type === 'video/webm' ||
+                          file.name.endsWith('.gif') ||
+                          file.name.endsWith('.webp')
+      
+      if (!isValidFile) {
+        showToast('Please select an image, GIF, or animation file', 'error')
         return
       }
       
-      if (file.size > 5 * 1024 * 1024) {
-        showToast('File size must be less than 5MB', 'error')
+      if (file.size > 10 * 1024 * 1024) {
+        showToast('File size must be less than 10MB', 'error')
         return
       }
       
@@ -119,13 +123,15 @@ const Banners = () => {
 
   const openCreateModal = () => {
     setModalMode('create')
-    setSelectedBanner(null)
+    setSelectedGift(null)
     setFormData({
-      title: '',
+      name: '',
       description: '',
+      category: 'general',
+      cost: 0,
       image: '',
       imageUrl: '',
-      isActive: true, // Always true by default
+      isActive: true,
       priority: 5
     })
     setSelectedImage(null)
@@ -133,25 +139,32 @@ const Banners = () => {
     setShowModal(true)
   }
 
-  const openEditModal = (banner) => {
+  const openEditModal = (gift) => {
     setModalMode('edit')
-    setSelectedBanner(banner)
+    setSelectedGift(gift)
     setFormData({
-      title: banner.title || '',
-      description: banner.description || '',
-      image: banner.image || banner.imageUrl || '',
-      imageUrl: banner.imageUrl || banner.image || '',
-      priority: banner.priority || 5,
-      isActive: banner.isActive !== undefined ? banner.isActive : true // Default to true if not set
+      name: gift.name || '',
+      description: gift.description || '',
+      category: gift.category || 'general',
+      cost: gift.cost || 0,
+      image: gift.image || gift.imageUrl || '',
+      imageUrl: gift.imageUrl || gift.image || '',
+      priority: gift.priority || 5,
+      isActive: gift.isActive !== undefined ? gift.isActive : true
     })
     setSelectedImage(null)
-    setImagePreview(banner.image || banner.imageUrl || null)
+    setImagePreview(gift.image || gift.imageUrl || null)
     setShowModal(true)
   }
 
-  const handleSaveBanner = async () => {
+  const handleSaveGift = async () => {
+    if (!formData.name.trim()) {
+      showToast('Please enter a gift name', 'error')
+      return
+    }
+
     if (!formData.imageUrl && !selectedImage) {
-      showToast('Please upload an image or provide image URL', 'error')
+      showToast('Please upload an image/animation or provide image URL', 'error')
       return
     }
 
@@ -161,11 +174,12 @@ const Banners = () => {
     try {
       let imageUrl = formData.imageUrl || ''
 
-      // Upload image if provided
+      // Upload image/animation if provided
       if (selectedImage) {
         setUploading(true)
         const timestamp = Date.now()
-        const filename = `banners/${timestamp}_${selectedImage.name}`
+        const sanitizedName = selectedImage.name.replace(/[^a-zA-Z0-9.-]/g, '_')
+        const filename = `gifts/${timestamp}_${sanitizedName}`
         const storageRef = ref(storage, filename)
         
         await uploadBytes(storageRef, selectedImage)
@@ -173,92 +187,87 @@ const Banners = () => {
         setUploading(false)
       }
 
-      // Simplified banner data - only for profile screen
-      // Simplified banner data - only for profile screen
-      const bannerData = {
-        title: formData.title || '',
-        description: formData.description || '',
+      const giftData = {
+        name: formData.name.trim(),
+        description: formData.description.trim() || '',
+        category: formData.category || 'general',
+        cost: Number(formData.cost) || 0,
         image: imageUrl,
         imageUrl: imageUrl,
-        banner: imageUrl,
+        asset: imageUrl,
         priority: Number(formData.priority) || 5,
-        targetPage: 'profile_screen', // Always profile_screen
-        actionTarget: 'profile_screen', // Always profile_screen
-        target: 'profile_screen', // Always profile_screen
+        isActive: formData.isActive !== undefined ? formData.isActive : true,
         updatedAt: serverTimestamp(),
         updatedBy: adminUser?.uid || 'admin'
       }
       
       if (modalMode === 'create') {
-        // NEW banners: Always set isActive to true
-        bannerData.isActive = true
-        bannerData.createdAt = serverTimestamp()
-        bannerData.views = 0
-        bannerData.clicks = 0
-        bannerData.impressions = 0
-        console.log('✅ Creating NEW banner with isActive: true')
-        await addDoc(collection(db, 'banners'), bannerData)
-        showToast('Banner created successfully!', 'success')
+        giftData.createdAt = serverTimestamp()
+        giftData.usageCount = 0
+        await addDoc(collection(db, 'gifts'), giftData)
+        showToast('Gift created successfully!', 'success')
       } else {
-        // EDIT banners: Use form value, but default to true if not set
-        bannerData.isActive = formData.isActive !== undefined ? formData.isActive : true
-        console.log('✅ Updating banner with isActive:', bannerData.isActive)
-        await updateDoc(doc(db, 'banners', selectedBanner.id), bannerData)
-        showToast('Banner updated successfully!', 'success')
+        await updateDoc(doc(db, 'gifts', selectedGift.id), giftData)
+        showToast('Gift updated successfully!', 'success')
       }
 
       setShowModal(false)
       setSelectedImage(null)
       setImagePreview(null)
     } catch (error) {
-      console.error('Error saving banner:', error)
-      showToast(`Error saving banner: ${error.message}`, 'error')
+      console.error('Error saving gift:', error)
+      showToast(`Error saving gift: ${error.message}`, 'error')
     } finally {
       setSaving(false)
       setUploading(false)
     }
   }
 
-  const handleDeleteBanner = async () => {
-    if (!bannerToDelete) return
+  const handleDeleteGift = async () => {
+    if (!giftToDelete) return
 
     try {
-      await deleteDoc(doc(db, 'banners', bannerToDelete.id))
-      showToast('Banner deleted successfully', 'success')
+      await deleteDoc(doc(db, 'gifts', giftToDelete.id))
+      showToast('Gift deleted successfully', 'success')
       setShowDeleteConfirm(false)
-      setBannerToDelete(null)
+      setGiftToDelete(null)
     } catch (error) {
-      console.error('Error deleting banner:', error)
-      showToast(`Error deleting banner: ${error.message}`, 'error')
+      console.error('Error deleting gift:', error)
+      showToast(`Error deleting gift: ${error.message}`, 'error')
     }
   }
 
-  const handleToggleActive = async (banner) => {
+  const handleToggleActive = async (gift) => {
     try {
-      await updateDoc(doc(db, 'banners', banner.id), {
-        isActive: !banner.isActive,
+      await updateDoc(doc(db, 'gifts', gift.id), {
+        isActive: !gift.isActive,
         updatedAt: serverTimestamp()
       })
-      showToast(`Banner ${!banner.isActive ? 'activated' : 'deactivated'}`, 'success')
+      showToast(`Gift ${!gift.isActive ? 'activated' : 'deactivated'}`, 'success')
     } catch (error) {
-      console.error('Error toggling banner status:', error)
-      showToast('Error updating banner status', 'error')
+      console.error('Error toggling gift status:', error)
+      showToast('Error updating gift status', 'error')
     }
   }
 
-  // Filter and sort banners
-  const filteredBanners = banners
-    .filter(banner => {
+  // Filter and sort gifts
+  const filteredGifts = gifts
+    .filter(gift => {
       const matchesSearch = 
-        (banner.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (banner.description || '').toLowerCase().includes(searchTerm.toLowerCase())
+        (gift.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (gift.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (gift.category || '').toLowerCase().includes(searchTerm.toLowerCase())
       
       const matchesStatus = 
         filterStatus === 'all' ||
-        (filterStatus === 'active' && banner.isActive) ||
-        (filterStatus === 'inactive' && !banner.isActive)
+        (filterStatus === 'active' && gift.isActive) ||
+        (filterStatus === 'inactive' && !gift.isActive)
       
-      return matchesSearch && matchesStatus
+      const matchesCategory = 
+        filterCategory === 'all' ||
+        gift.category === filterCategory
+      
+      return matchesSearch && matchesStatus && matchesCategory
     })
     .sort((a, b) => {
       switch (sortBy) {
@@ -266,10 +275,10 @@ const Banners = () => {
           return b.priority - a.priority
         case 'date':
           return b.createdAt.getTime() - a.createdAt.getTime()
-        case 'views':
-          return (b.views || 0) - (a.views || 0)
-        case 'clicks':
-          return (b.clicks || 0) - (a.clicks || 0)
+        case 'name':
+          return (a.name || '').localeCompare(b.name || '')
+        case 'cost':
+          return (a.cost || 0) - (b.cost || 0)
         default:
           return 0
       }
@@ -294,12 +303,12 @@ const Banners = () => {
         <div>
           <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
             <div className="w-10 h-10 bg-pink-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(-5deg)' }}>
-              <BannerIcon className="w-6 h-6 text-white" />
+              <Gift className="w-6 h-6 text-white" />
             </div>
-            Banners
+            Gifts
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Manage promotional banners displayed in the user app
+            Manage gifts that users can send in the app
           </p>
         </div>
         <button
@@ -307,7 +316,7 @@ const Banners = () => {
           className="btn-primary flex items-center gap-2"
         >
           <Plus className="w-5 h-5" />
-          New Banner
+          New Gift
         </button>
       </motion.div>
 
@@ -319,11 +328,11 @@ const Banners = () => {
       >
         <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
           <SearchBar
-            placeholder="Search banners by title or description..."
+            placeholder="Search gifts by name, description, or category..."
             value={searchTerm}
             onChange={setSearchTerm}
           />
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-2 items-center flex-wrap">
             <Filter className="w-5 h-5 text-gray-500" />
             <select
               value={filterStatus}
@@ -334,21 +343,33 @@ const Banners = () => {
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </select>
+            {categories.length > 1 && (
+              <select
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+                className="input-field"
+              >
+                <option value="all">All Categories</option>
+                {categories.filter(c => c !== 'all').map(cat => (
+                  <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
+                ))}
+              </select>
+            )}
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
               className="input-field"
             >
               <option value="priority">Sort by Priority</option>
+              <option value="name">Sort by Name</option>
+              <option value="cost">Sort by Cost</option>
               <option value="date">Sort by Date</option>
-              <option value="views">Sort by Views</option>
-              <option value="clicks">Sort by Clicks</option>
             </select>
           </div>
         </div>
       </motion.div>
 
-      {/* Banners Grid */}
+      {/* Gifts Grid */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -356,96 +377,94 @@ const Banners = () => {
         className="card"
       >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold">Banners ({filteredBanners.length})</h2>
+          <h2 className="text-xl font-bold">Gifts ({filteredGifts.length})</h2>
         </div>
 
-        {filteredBanners.length === 0 ? (
+        {filteredGifts.length === 0 ? (
           <div className="text-center py-12">
-            <ImageIcon className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+            <Gift className="w-16 h-16 mx-auto text-gray-400 mb-4" />
             <p className="text-gray-600 dark:text-gray-400">
-              {banners.length === 0 
-                ? 'No banners yet. Create your first banner!' 
-                : 'No banners match your filter.'}
+              {gifts.length === 0 
+                ? 'No gifts yet. Create your first gift!' 
+                : 'No gifts match your filter.'}
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredBanners.map((banner) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filteredGifts.map((gift) => (
               <motion.div
-                key={banner.id}
+                key={gift.id}
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
               >
-                {/* Banner Image */}
-                <div className="relative">
-                  <img
-                    src={banner.image || banner.imageUrl || banner.banner}
-                    alt={banner.title || 'Banner'}
-                    className="w-full h-48 object-cover"
-                    onError={(e) => {
-                      e.target.src = 'https://via.placeholder.com/800x200/cccccc/666666?text=No+Image'
-                    }}
-                  />
-                  <div className="absolute top-2 right-2 flex gap-2">
+                {/* Gift Image/Animation */}
+                <div className="relative bg-gray-100 dark:bg-gray-800">
+                  <div className="w-full h-48 flex items-center justify-center">
+                    {gift.image || gift.imageUrl ? (
+                      <img
+                        src={gift.image || gift.imageUrl}
+                        alt={gift.name || 'Gift'}
+                        className="w-full h-full object-contain"
+                        onError={(e) => {
+                          e.target.src = 'https://via.placeholder.com/200/cccccc/666666?text=No+Image'
+                        }}
+                      />
+                    ) : (
+                      <Gift className="w-24 h-24 text-gray-400" />
+                    )}
+                  </div>
+                  <div className="absolute top-2 right-2 flex gap-2 flex-wrap">
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      banner.isActive 
+                      gift.isActive 
                         ? 'bg-green-500 text-white' 
                         : 'bg-gray-500 text-white'
                     }`}>
-                      {banner.isActive ? 'Active' : 'Inactive'}
+                      {gift.isActive ? 'Active' : 'Inactive'}
                     </span>
                     <span className="px-3 py-1 bg-blue-500 text-white rounded-full text-xs font-medium">
-                      Priority: {banner.priority}
+                      Priority: {gift.priority}
                     </span>
                   </div>
                 </div>
 
-                {/* Banner Info */}
+                {/* Gift Info */}
                 <div className="p-4">
-                  <h3 className="font-bold text-lg mb-2">{banner.title || 'Untitled Banner'}</h3>
-                  {banner.description && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
-                      {banner.description}
+                  <h3 className="font-bold text-lg mb-1">{gift.name || 'Unnamed Gift'}</h3>
+                  {gift.description && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 line-clamp-2">
+                      {gift.description}
                     </p>
                   )}
                   
-                  <div className="mb-2">
-                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded text-xs font-medium">
-                      📍 Profile Screen
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded text-xs font-medium capitalize">
+                      {gift.category || 'general'}
                     </span>
+                    {gift.cost > 0 && (
+                      <span className="text-sm font-semibold text-pink-600 dark:text-pink-400">
+                        💰 {gift.cost} coins
+                      </span>
+                    )}
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-2 text-xs text-gray-500 mb-3">
-                    <div>
-                      <span className="font-semibold">Views:</span> {banner.views || 0}
+                  {gift.usageCount !== undefined && (
+                    <div className="text-xs text-gray-500 mb-3">
+                      <span className="font-semibold">Used:</span> {gift.usageCount || 0} times
                     </div>
-                    <div>
-                      <span className="font-semibold">Clicks:</span> {banner.clicks || 0}
-                    </div>
-                    {banner.startDate && (
-                      <div>
-                        <span className="font-semibold">Start:</span> {new Date(banner.startDate).toLocaleDateString()}
-                      </div>
-                    )}
-                    {banner.endDate && (
-                      <div>
-                        <span className="font-semibold">End:</span> {new Date(banner.endDate).toLocaleDateString()}
-                      </div>
-                    )}
-                  </div>
+                  )}
 
                   {/* Actions */}
                   <div className="flex gap-2">
                     <button
-                      onClick={() => handleToggleActive(banner)}
+                      onClick={() => handleToggleActive(gift)}
                       className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        banner.isActive
+                        gift.isActive
                           ? 'bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400'
                           : 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400'
                       }`}
                     >
-                      {banner.isActive ? (
+                      {gift.isActive ? (
                         <>
                           <XCircle className="w-4 h-4 inline mr-1" />
                           Deactivate
@@ -458,19 +477,19 @@ const Banners = () => {
                       )}
                     </button>
                     <button
-                      onClick={() => openEditModal(banner)}
+                      onClick={() => openEditModal(gift)}
                       className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                      title="Edit Banner"
+                      title="Edit Gift"
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => {
-                        setBannerToDelete(banner)
+                        setGiftToDelete(gift)
                         setShowDeleteConfirm(true)
                       }}
                       className="p-2 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 rounded-lg transition-colors"
-                      title="Delete Banner"
+                      title="Delete Gift"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -486,17 +505,17 @@ const Banners = () => {
       <Modal
         isOpen={showModal}
         onClose={() => setShowModal(false)}
-        title={modalMode === 'create' ? 'Create New Banner' : 'Edit Banner'}
+        title={modalMode === 'create' ? 'Create New Gift' : 'Edit Gift'}
       >
         <div className="space-y-4 max-h-[80vh] overflow-y-auto">
-          {/* Title */}
+          {/* Name */}
           <div>
-            <label className="block text-sm font-medium mb-2">Banner Title</label>
+            <label className="block text-sm font-medium mb-2">Gift Name *</label>
             <input
               type="text"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              placeholder="Enter banner title (optional)"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="Enter gift name (e.g., Rose, Heart, Star)"
               className="input-field"
               disabled={saving || uploading}
             />
@@ -508,32 +527,68 @@ const Banners = () => {
             <textarea
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Enter banner description (optional)"
+              placeholder="Enter gift description (optional)"
               rows={3}
               className="input-field resize-none"
               disabled={saving || uploading}
             />
           </div>
 
-          {/* Image Upload */}
+          {/* Category */}
           <div>
-            <label className="block text-sm font-medium mb-2">Banner Image *</label>
+            <label className="block text-sm font-medium mb-2">Category</label>
+            <select
+              value={formData.category}
+              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+              className="input-field"
+              disabled={saving || uploading}
+            >
+              <option value="general">General</option>
+              <option value="love">Love</option>
+              <option value="celebration">Celebration</option>
+              <option value="funny">Funny</option>
+              <option value="special">Special</option>
+              <option value="premium">Premium</option>
+            </select>
+          </div>
+
+          {/* Cost */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Cost (Coins)</label>
+            <input
+              type="number"
+              min="0"
+              value={formData.cost}
+              onChange={(e) => setFormData({ ...formData, cost: parseInt(e.target.value) || 0 })}
+              placeholder="0"
+              className="input-field"
+              disabled={saving || uploading}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Enter 0 for free gifts, or set a coin cost for premium gifts
+            </p>
+          </div>
+
+          {/* Image/Animation Upload */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Gift Asset (Image/Animation) *</label>
             
-            {/* Banner Size Guide */}
+            {/* Upload Guidelines */}
             <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-              <div className="flex items-start gap-2 mb-2">
-                <ImageIcon className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+              <div className="flex items-start gap-2">
+                <Sparkles className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">
-                    📐 Recommended Banner Size
+                    📦 Gift Asset Guidelines
                   </p>
                   <div className="text-xs text-blue-700 dark:text-blue-400 space-y-1">
-                    <p className="font-medium">Option 1: Standard quality (recommended)</p>
+                    <p className="font-medium">Supported formats:</p>
                     <ul className="list-disc list-inside space-y-0.5 ml-2">
-                      <li>Width: <span className="font-semibold">1200px</span></li>
-                      <li>Height: <span className="font-semibold">200px</span></li>
-                      <li>Aspect ratio: <span className="font-semibold">6:1</span></li>
-                      <li>File size: <span className="font-semibold">~50–150 KB</span> (optimized)</li>
+                      <li>Images: PNG, JPG, WebP</li>
+                      <li>Animations: GIF, MP4, WebM</li>
+                      <li>Recommended size: 200x200px to 500x500px</li>
+                      <li>File size: Max 10MB</li>
+                      <li>For best results, use transparent backgrounds (PNG)</li>
                     </ul>
                   </div>
                 </div>
@@ -544,7 +599,7 @@ const Banners = () => {
               <label className="cursor-pointer">
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/*,video/mp4,video/webm"
                   onChange={handleImageChange}
                   className="hidden"
                   disabled={saving || uploading}
@@ -552,7 +607,7 @@ const Banners = () => {
                 <div className="flex items-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-primary-500 dark:hover:border-primary-500 transition-colors">
                   <ImageIcon className="w-5 h-5 text-gray-500" />
                   <span className="text-sm text-gray-600 dark:text-gray-400">
-                    {selectedImage ? selectedImage.name : 'Upload Image'}
+                    {selectedImage ? selectedImage.name : 'Upload Image/Animation'}
                   </span>
                 </div>
               </label>
@@ -570,7 +625,7 @@ const Banners = () => {
 
             {/* Image URL Input */}
             <div className="mb-2">
-              <p className="text-xs text-gray-500 mb-1">OR enter image URL:</p>
+              <p className="text-xs text-gray-500 mb-1">OR enter image/animation URL:</p>
               <input
                 type="text"
                 value={formData.imageUrl}
@@ -581,7 +636,7 @@ const Banners = () => {
                     setSelectedImage(null)
                   }
                 }}
-                placeholder="https://example.com/image.jpg"
+                placeholder="https://example.com/gift.gif"
                 className="input-field"
                 disabled={saving || uploading || !!selectedImage}
               />
@@ -590,27 +645,27 @@ const Banners = () => {
             {/* Image Preview */}
             {imagePreview && (
               <div className="mt-3">
-                <img
-                  src={imagePreview}
-                  alt="Preview"
-                  className="w-full max-w-md h-48 object-contain bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
-                  onError={() => setImagePreview(null)}
-                />
+                <div className="w-full max-w-md h-48 flex items-center justify-center bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                  {imagePreview.includes('.mp4') || imagePreview.includes('.webm') ? (
+                    <video
+                      src={imagePreview}
+                      className="max-w-full max-h-full object-contain"
+                      autoPlay
+                      loop
+                      muted
+                      onError={() => setImagePreview(null)}
+                    />
+                  ) : (
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      className="max-w-full max-h-full object-contain"
+                      onError={() => setImagePreview(null)}
+                    />
+                  )}
+                </div>
               </div>
             )}
-          </div>
-
-          {/* Target Page - Fixed to Profile Screen */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Target Page</label>
-            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-              <p className="text-sm text-blue-800 dark:text-blue-300 font-medium">
-                📍 Profile Screen
-              </p>
-              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                Banners are displayed only on the Profile Screen in the user app.
-              </p>
-            </div>
           </div>
 
           {/* Priority */}
@@ -631,9 +686,12 @@ const Banners = () => {
               <span>Low (1)</span>
               <span>High (10)</span>
             </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Higher priority gifts appear first in the user app
+            </p>
           </div>
 
-          {/* Status - Always Active by default */}
+          {/* Status */}
           <div>
             <label className="block text-sm font-medium mb-2">Status</label>
             <div className="flex gap-4">
@@ -661,7 +719,7 @@ const Banners = () => {
               </label>
             </div>
             <p className="text-xs text-gray-500 mt-2">
-              ⚠️ Only Active banners will appear in the user app. New banners are Active by default.
+              ⚠️ Only Active gifts will appear in the user app. New gifts are Active by default.
             </p>
           </div>
 
@@ -675,9 +733,9 @@ const Banners = () => {
               Cancel
             </button>
             <button
-              onClick={handleSaveBanner}
+              onClick={handleSaveGift}
               className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50"
-              disabled={saving || uploading || (!formData.imageUrl && !selectedImage)}
+              disabled={saving || uploading || !formData.name.trim() || (!formData.imageUrl && !selectedImage)}
             >
               {uploading ? (
                 <>
@@ -692,7 +750,7 @@ const Banners = () => {
               ) : (
                 <>
                   <Plus className="w-5 h-5" />
-                  {modalMode === 'create' ? 'Create Banner' : 'Update Banner'}
+                  {modalMode === 'create' ? 'Create Gift' : 'Update Gift'}
                 </>
               )}
             </button>
@@ -704,15 +762,20 @@ const Banners = () => {
       <Modal
         isOpen={showDeleteConfirm}
         onClose={() => setShowDeleteConfirm(false)}
-        title="Delete Banner"
+        title="Delete Gift"
       >
         <div className="space-y-4">
           <p className="text-gray-600 dark:text-gray-400">
-            Are you sure you want to delete this banner? This action cannot be undone.
+            Are you sure you want to delete this gift? This action cannot be undone.
           </p>
-          {bannerToDelete && (
+          {giftToDelete && (
             <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-              <p className="font-semibold">{bannerToDelete.title || 'Untitled Banner'}</p>
+              <p className="font-semibold">{giftToDelete.name || 'Unnamed Gift'}</p>
+              {giftToDelete.usageCount > 0 && (
+                <p className="text-sm text-gray-500 mt-1">
+                  ⚠️ This gift has been used {giftToDelete.usageCount} times
+                </p>
+              )}
             </div>
           )}
           <div className="flex gap-3 pt-4">
@@ -723,10 +786,10 @@ const Banners = () => {
               Cancel
             </button>
             <button
-              onClick={handleDeleteBanner}
+              onClick={handleDeleteGift}
               className="btn-danger flex-1"
             >
-              Delete Banner
+              Delete Gift
             </button>
           </div>
         </div>
@@ -735,4 +798,4 @@ const Banners = () => {
   )
 }
 
-export default Banners
+export default Gifts

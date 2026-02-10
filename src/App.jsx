@@ -11,10 +11,12 @@ import TicketsV2 from './pages/TicketsV2'
 import Chats from './pages/Chats'
 import ChamakzTeam from './pages/ChamakzTeam'
 import Banners from './pages/Banners'
+import Gifts from './pages/Gifts'
 import HostApplications from './pages/HostApplications'
 import Feedback from './pages/Feedback'
 import Events from './pages/Events'
 import Settings from './pages/Settings'
+import Complaints from './pages/Complaints'
 
 function App() {
   return (
@@ -42,9 +44,11 @@ function App() {
             <Route path="chats" element={<Chats />} />
             <Route path="chamakz-team" element={<ChamakzTeam />} />
             <Route path="banners" element={<Banners />} />
+            <Route path="gifts" element={<Gifts />} />
             <Route path="host-applications" element={<HostApplications />} />
             <Route path="feedback" element={<Feedback />} />
             <Route path="events" element={<Events />} />
+            <Route path="complaints" element={<Complaints />} />
             <Route path="settings" element={<Settings />} />
             </Route>
           </Routes>

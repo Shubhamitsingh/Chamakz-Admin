@@ -191,7 +191,9 @@ const Settings = () => {
         animate={{ opacity: 1, y: 0 }}
       >
         <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-          <SettingsIcon className="w-8 h-8 text-primary-500" />
+          <div className="w-10 h-10 bg-pink-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(-5deg)' }}>
+            <SettingsIcon className="w-6 h-6 text-white" />
+          </div>
           Settings
         </h1>
         <p className="text-gray-600 dark:text-gray-400">Configure application settings and admin preferences</p>

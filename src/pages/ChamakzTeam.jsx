@@ -263,7 +263,9 @@ const ChamakzTeam = () => {
       >
         <div>
           <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-            <UsersRound className="w-8 h-8 text-primary-500" />
+            <div className="w-10 h-10 bg-pink-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(-5deg)' }}>
+              <UsersRound className="w-6 h-6 text-white" />
+            </div>
             Chamakz Team
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
@@ -401,7 +403,7 @@ const ChamakzTeam = () => {
               >
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1">
-                    <p className="font-semibold text-primary-600 dark:text-primary-400">
+                    <p className="font-semibold text-pink-600 dark:text-pink-400">
                       {msg.sender || msg.senderName || 'Admin'}
                     </p>
                     <p className="text-xs text-gray-500">

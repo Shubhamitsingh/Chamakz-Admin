@@ -5,6 +5,154 @@ const admin = require('firebase-admin');
 admin.initializeApp();
 
 /**
+ * Send push notification when admin sends a chat message
+ * Triggers automatically when a new message is added to supportChats/{chatId}/messages
+ */
+exports.sendChatNotification = functions.firestore
+  .document('supportChats/{chatId}/messages/{messageId}')
+  .onCreate(async (snap, context) => {
+    const messageData = snap.data();
+    const chatId = context.params.chatId;
+    
+    console.log('💬 New message created in chat:', chatId);
+    console.log('📝 Message data:', {
+      senderType: messageData.senderType,
+      isAdmin: messageData.isAdmin,
+      text: messageData.text?.substring(0, 50)
+    });
+    
+    // Only send notification if message is from admin
+    const isAdminMessage = messageData.senderType === 'admin' || messageData.isAdmin === true || messageData.sender === 'admin';
+    
+    if (!isAdminMessage) {
+      console.log('⏭️ Skipping notification - message is from user, not admin');
+      return null;
+    }
+    
+    try {
+      // Get chat document to find userId
+      const chatDoc = await admin.firestore().collection('supportChats').doc(chatId).get();
+      
+      if (!chatDoc.exists) {
+        console.error('❌ Chat document not found:', chatId);
+        return null;
+      }
+      
+      const chatData = chatDoc.data();
+      const userId = chatData.userId || chatData.uid || '';
+      
+      if (!userId) {
+        console.error('❌ User ID not found in chat document');
+        return null;
+      }
+      
+      console.log('👤 Found user ID:', userId);
+      
+      // Get user document to find FCM token
+      const userDoc = await admin.firestore().collection('users').doc(userId).get();
+      
+      if (!userDoc.exists) {
+        console.error('❌ User document not found:', userId);
+        return null;
+      }
+      
+      const userData = userDoc.data();
+      
+      // Get FCM token - check multiple possible field names
+      const fcmToken = userData.fcmToken || 
+                       userData.fcm_token || 
+                       userData.deviceToken || 
+                       userData.device_token ||
+                       userData.pushToken ||
+                       userData.push_token ||
+                       userData.token ||
+                       '';
+      
+      if (!fcmToken) {
+        console.warn('⚠️ FCM token not found for user:', userId);
+        console.warn('💡 User needs to enable notifications in the app');
+        return null;
+      }
+      
+      console.log('📱 Found FCM token for user');
+      
+      // Get user name for notification
+      const userName = userData.userName || 
+                       userData.username || 
+                       userData.name || 
+                       'User';
+      
+      // Get message text (truncate if too long)
+      const messageText = messageData.text || 
+                          messageData.message || 
+                          messageData.content || 
+                          'New message from admin';
+      const truncatedMessage = messageText.length > 100 
+        ? messageText.substring(0, 100) + '...' 
+        : messageText;
+      
+      // Prepare notification payload
+      const notification = {
+        title: 'New Message from Admin',
+        body: truncatedMessage,
+        sound: 'default',
+        badge: '1',
+        clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+        data: {
+          type: 'chat_message',
+          chatId: chatId,
+          messageId: snap.id,
+          sender: 'admin',
+          userId: userId
+        }
+      };
+      
+      // Send notification
+      const message = {
+        notification: notification,
+        data: notification.data,
+        token: fcmToken,
+        android: {
+          priority: 'high',
+          notification: {
+            sound: 'default',
+            channelId: 'chat_notifications',
+            priority: 'high'
+          }
+        },
+        apns: {
+          payload: {
+            aps: {
+              sound: 'default',
+              badge: 1,
+              alert: {
+                title: notification.title,
+                body: notification.body
+              }
+            }
+          }
+        }
+      };
+      
+      const response = await admin.messaging().send(message);
+      console.log('✅ Push notification sent successfully:', response);
+      
+      return null;
+    } catch (error) {
+      console.error('❌ Error sending push notification:', error);
+      
+      // Don't throw error - we don't want to break message sending
+      // Just log the error for debugging
+      if (error.code === 'messaging/invalid-registration-token' || 
+          error.code === 'messaging/registration-token-not-registered') {
+        console.warn('⚠️ Invalid FCM token - user may need to re-enable notifications');
+      }
+      
+      return null;
+    }
+  });
+
+/**
  * Process scheduled messages that are due to be sent
  * Runs every minute automatically
  */

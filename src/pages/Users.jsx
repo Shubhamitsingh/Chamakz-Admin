@@ -13,6 +13,7 @@ import ExportButton from '../components/ExportButton'
 import { collection, doc, updateDoc, onSnapshot, serverTimestamp } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { fixIncorrectNewUserPermissions } from '../firebase/users'
+import UserAvatar from '../components/UserAvatar'
 
 const Users = () => {
   const appContext = useApp()
@@ -48,6 +49,8 @@ const Users = () => {
         
         const usersCollection = collection(db, 'users')
         
+        // Real-time listener: Automatically updates when any user document changes
+        // This includes changes to ucoin, coins, or any other field
         unsubscribe = onSnapshot(
           usersCollection,
           (snapshot) => {
@@ -99,7 +102,8 @@ const Users = () => {
                   const isActive = data.isActive === true // Only explicitly true means approved
                   
                   // Get coins - check ucoin first (real user coins), then fallback to coins
-                  const userCoins = Number(data.ucoin) || Number(data.coins) || 0
+                  // Real-time: This will update automatically when ucoin or coins field changes
+                  const userCoins = Number(data.ucoin ?? data.coins ?? 0)
                   
                   // Get phone number - try multiple field name variations
                   const userPhone = data.phone || data.phoneNumber || data.userPhone || data.user_phone || data.mobile || data.mobileNumber || ''
@@ -325,7 +329,7 @@ const Users = () => {
       accessor: 'numericUserId',
       render: (row) => (
         <div>
-          <span className="font-mono text-sm font-bold text-primary-600 dark:text-primary-400 block">
+          <span className="font-mono text-sm font-bold text-pink-600 dark:text-pink-400 bg-pink-50 dark:bg-pink-900/20 px-2 py-0.5 rounded block">
             {row?.numericUserId || 'N/A'}
           </span>
           <span className="text-xs text-gray-500 font-mono">
@@ -341,11 +345,15 @@ const Users = () => {
         const name = row?.name || 'Unknown'
         const phone = row?.phone || 'No phone'
         const phoneDisplay = phone !== 'No phone' ? `Ph: ${phone}` : phone
+        const userId = row?.id || row?.numericUserId || name
+        
         return (
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-full flex items-center justify-center text-white font-bold">
-              {name.charAt(0).toUpperCase()}
-            </div>
+            <UserAvatar 
+              userId={userId} 
+              name={name} 
+              size="md"
+            />
             <div>
               <p className="font-medium">{name}</p>
               <p className="text-xs text-gray-500">{phoneDisplay}</p>
@@ -600,16 +608,24 @@ const Users = () => {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 relative -mt-6">
+      {/* 2D Decorative Background Elements */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-5">
+        <div className="absolute top-20 right-20 w-64 h-64 bg-pink-300 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-20 left-20 w-48 h-48 bg-purple-300 rounded-full blur-2xl"></div>
+      </div>
+
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between"
+        className="flex items-center justify-between relative z-10"
       >
         <div>
           <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-            <UsersIcon className="w-8 h-8 text-primary-500" />
+            <div className="w-10 h-10 bg-pink-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(-5deg)' }}>
+              <UsersIcon className="w-6 h-6 text-white" />
+            </div>
             Users
           </h1>
           <p className="text-gray-600 dark:text-gray-400">Manage user accounts, permissions, and live streaming access</p>
@@ -634,11 +650,17 @@ const Users = () => {
         </button>
       </motion.div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="card flex items-center gap-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-            <UsersIcon className="w-6 h-6 text-white" />
+      {/* Stats Cards - 2D Style */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 relative z-10">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }} 
+          animate={{ opacity: 1, y: 0 }} 
+          className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 flex items-center gap-4 relative overflow-hidden"
+          style={{ boxShadow: 'none' }}
+        >
+          <div className="absolute top-0 left-0 w-full h-1 bg-pink-500 rounded-t-2xl"></div>
+          <div className="w-14 h-14 bg-pink-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(-5deg)' }}>
+            <UsersIcon className="w-7 h-7 text-white" />
           </div>
           <div>
             <p className="text-sm text-gray-600 dark:text-gray-400">Total Users</p>
@@ -646,9 +668,16 @@ const Users = () => {
           </div>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="card flex items-center gap-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
-            <Video className="w-6 h-6 text-white" />
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }} 
+          animate={{ opacity: 1, y: 0 }} 
+          transition={{ delay: 0.1 }} 
+          className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 flex items-center gap-4 relative overflow-hidden"
+          style={{ boxShadow: 'none' }}
+        >
+          <div className="absolute top-0 left-0 w-full h-1 bg-purple-500 rounded-t-2xl"></div>
+          <div className="w-14 h-14 bg-purple-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(5deg)' }}>
+            <Video className="w-7 h-7 text-white" />
           </div>
           <div>
             <p className="text-sm text-gray-600 dark:text-gray-400">Live Approved</p>
@@ -656,9 +685,16 @@ const Users = () => {
           </div>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="card flex items-center gap-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-lg flex items-center justify-center">
-            <VideoOff className="w-6 h-6 text-white" />
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }} 
+          animate={{ opacity: 1, y: 0 }} 
+          transition={{ delay: 0.2 }} 
+          className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 flex items-center gap-4 relative overflow-hidden"
+          style={{ boxShadow: 'none' }}
+        >
+          <div className="absolute top-0 left-0 w-full h-1 bg-orange-500 rounded-t-2xl"></div>
+          <div className="w-14 h-14 bg-orange-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(-5deg)' }}>
+            <VideoOff className="w-7 h-7 text-white" />
           </div>
           <div>
             <p className="text-sm text-gray-600 dark:text-gray-400">Not Approved</p>
@@ -666,9 +702,16 @@ const Users = () => {
           </div>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="card flex items-center gap-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-lg flex items-center justify-center">
-            <CheckCircle className="w-6 h-6 text-white" />
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }} 
+          animate={{ opacity: 1, y: 0 }} 
+          transition={{ delay: 0.3 }} 
+          className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 flex items-center gap-4 relative overflow-hidden"
+          style={{ boxShadow: 'none' }}
+        >
+          <div className="absolute top-0 left-0 w-full h-1 bg-primary-400 rounded-t-2xl"></div>
+          <div className="w-14 h-14 bg-primary-400 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(5deg)' }}>
+            <CheckCircle className="w-7 h-7 text-white" />
           </div>
           <div>
             <p className="text-sm text-gray-600 dark:text-gray-400">Active Users</p>
@@ -682,7 +725,8 @@ const Users = () => {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="card"
+        className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 relative z-10"
+        style={{ boxShadow: 'none' }}
       >
         <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
           <div className="flex-1">
@@ -727,10 +771,14 @@ const Users = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="card"
+        className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 relative z-10"
+        style={{ boxShadow: 'none' }}
       >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold">All Users ({filteredUsers.length})</h2>
+          <h2 className="text-xl font-bold flex items-center gap-2">
+            <div className="w-1 h-6 bg-pink-500 rounded-full"></div>
+            All Users ({filteredUsers.length})
+          </h2>
         </div>
         {filteredUsers.length === 0 ? (
           <EmptyState
@@ -771,9 +819,12 @@ const Users = () => {
         >
           <div className="space-y-4">
             <div className="flex items-center gap-4">
-              <div className="w-20 h-20 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-full flex items-center justify-center text-white font-bold text-2xl">
-                {(selectedUser.name || 'U').charAt(0).toUpperCase()}
-              </div>
+              <UserAvatar 
+                userId={selectedUser.id || selectedUser.numericUserId || selectedUser.name} 
+                name={selectedUser.name || 'User'} 
+                size="lg"
+                className="rounded-2xl"
+              />
               <div>
                 <h3 className="text-2xl font-bold">{selectedUser.name || 'Unknown User'}</h3>
                 <p className="text-gray-600 dark:text-gray-400">
@@ -782,7 +833,7 @@ const Users = () => {
                     : 'No phone'}
                 </p>
                 <div className="mt-2 space-y-1">
-                  <p className="text-sm font-mono font-bold text-primary-600 dark:text-primary-400">
+                  <p className="text-sm font-mono font-bold text-pink-600 dark:text-pink-400 bg-pink-50 dark:bg-pink-900/20 px-2 py-0.5 rounded inline-block">
                     User ID: {selectedUser.numericUserId || 'N/A'}
                   </p>
                   <p className="text-xs font-mono text-gray-500">

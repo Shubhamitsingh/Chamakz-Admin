@@ -351,7 +351,7 @@ const Feedback = () => {
       header: 'Feedback ID', 
       accessor: 'feedbackId',
       render: (row) => (
-        <span className="font-mono font-semibold text-primary-600 dark:text-primary-400">
+        <span className="font-mono font-semibold text-pink-600 dark:text-pink-400">
           #{row.feedbackId}
         </span>
       )
@@ -362,7 +362,7 @@ const Feedback = () => {
       render: (row) => (
         <div>
           <p className="font-medium">{row.username}</p>
-          <p className="text-xs text-primary-600 dark:text-primary-400 font-mono font-bold">
+          <p className="text-xs text-pink-600 dark:text-pink-400 font-mono font-bold">
             ID: {row.numericUserId}
           </p>
           {row.email !== 'N/A' && (
@@ -444,7 +444,9 @@ const Feedback = () => {
         animate={{ opacity: 1, y: 0 }}
       >
         <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-          <MessageCircle className="w-8 h-8 text-primary-500" />
+          <div className="w-10 h-10 bg-pink-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(-5deg)' }}>
+            <MessageCircle className="w-6 h-6 text-white" />
+          </div>
           Feedback
         </h1>
         <p className="text-gray-600 dark:text-gray-400">Review user feedback, suggestions, and app reviews</p>
@@ -499,7 +501,7 @@ const Feedback = () => {
             onClick={() => setActiveTab('new')}
             className={`flex items-center gap-2 px-4 py-3 font-medium transition-colors relative ${
               activeTab === 'new'
-                ? 'text-primary-600 dark:text-primary-400'
+                ? 'text-pink-600 dark:text-pink-400'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
             }`}
           >
@@ -519,7 +521,7 @@ const Feedback = () => {
             onClick={() => setActiveTab('read')}
             className={`flex items-center gap-2 px-4 py-3 font-medium transition-colors relative ${
               activeTab === 'read'
-                ? 'text-primary-600 dark:text-primary-400'
+                ? 'text-pink-600 dark:text-pink-400'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
             }`}
           >
@@ -605,7 +607,7 @@ const Feedback = () => {
                 </div>
                 <div>
                   <span className="text-gray-600 dark:text-gray-400">User ID:</span>
-                  <span className="ml-2 font-bold text-primary-600 dark:text-primary-400 font-mono">
+                  <span className="ml-2 font-bold text-pink-600 dark:text-pink-400 font-mono">
                     {selectedFeedback.numericUserId}
                   </span>
                 </div>
