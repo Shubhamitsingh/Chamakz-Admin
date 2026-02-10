@@ -815,7 +815,7 @@ const Dashboard = () => {
       title: 'Active Users',
       value: (stats.activeUsers || 0).toLocaleString(),
       icon: UserCheck,
-      color: 'primary',
+      color: 'secondary',
       trend: { positive: true, value: `${stats.activeUsers || 0}`, label: 'currently using app' },
     },
     {
@@ -829,7 +829,7 @@ const Dashboard = () => {
       title: 'Approved Hosts',
       value: stats.approvedHosts,
       icon: Key,
-      color: 'primary',
+      color: 'purple',
       trend: { positive: true, value: `${stats.approvedHosts}`, label: 'approved hosts' },
     },
   ]
@@ -955,28 +955,28 @@ const Dashboard = () => {
           title="Today's Revenue"
           value={`₹${revenueStats.todayRevenue.toLocaleString()}`}
           icon={DollarSign}
-          color="primary"
+          color="green"
           trend={{ positive: true, value: "Today", label: "total revenue" }}
         />
         <StatCard
           title="Coins Purchased"
           value={revenueStats.coinsPurchasedToday.toLocaleString()}
           icon={TrendingUp}
-          color="primary"
+          color="teal"
           trend={{ positive: true, value: "Today", label: "coins bought" }}
         />
         <StatCard
           title="Coins Spent"
           value={revenueStats.coinsSpentToday.toLocaleString()}
           icon={TrendingDown}
-          color="orange"
+          color="red"
           trend={{ positive: false, value: "Today", label: "coins used" }}
         />
         <StatCard
           title="Top Earning Host"
           value={revenueStats.topEarningHost.name}
           icon={Trophy}
-          color="primary"
+          color="indigo"
           trend={{ positive: true, value: `₹${revenueStats.topEarningHost.amount.toLocaleString()}`, label: "today" }}
         />
       </motion.div>

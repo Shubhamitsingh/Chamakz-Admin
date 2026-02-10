@@ -27,6 +27,26 @@ const StatCard = ({ title, value, icon: Icon, color = 'primary', trend, delay = 
       main: '#ec4899',
       light: '#f9a8d4',
       dark: '#db2777'
+    },
+    green: {
+      main: '#10b981',
+      light: '#6ee7b7',
+      dark: '#059669'
+    },
+    teal: {
+      main: '#14b8a6',
+      light: '#5eead4',
+      dark: '#0d9488'
+    },
+    indigo: {
+      main: '#6366f1',
+      light: '#a5b4fc',
+      dark: '#4f46e5'
+    },
+    red: {
+      main: '#ef4444',
+      light: '#fca5a5',
+      dark: '#dc2626'
     }
   }
 

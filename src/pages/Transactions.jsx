@@ -508,15 +508,15 @@ const Transactions = () => {
         initial={{ opacity: 0, y: 20 }} 
         animate={{ opacity: 1, y: 0 }} 
         className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 relative z-10"
-        style={{ boxShadow: 'none' }}
+        style={{ boxShadow: 'none', overflow: 'visible' }}
       >
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+        <div className="flex flex-col md:flex-row gap-4 items-center justify-between" style={{ overflow: 'visible' }}>
           <SearchBar
             placeholder="Search by host name, ID, or account..."
             value={searchTerm}
             onChange={setSearchTerm}
           />
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-2 items-center" style={{ position: 'relative', zIndex: 10001 }}>
             <Filter className="w-5 h-5 text-gray-500" />
             <select
               value={filterStatus}
