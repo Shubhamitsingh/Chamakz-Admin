@@ -355,8 +355,16 @@ const Dashboard = () => {
               }
             })
             
-            // Sort by createdAt descending and take top 10
-            allUsers.sort((a, b) => b.createdAt - a.createdAt)
+            // Sort by createdAt descending (newest first) and take top 10
+            allUsers.sort((a, b) => {
+              try {
+                const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt).getTime()
+                const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt).getTime()
+                return bTime - aTime // Descending order (newest first)
+              } catch (e) {
+                return 0 // Keep original order if date parsing fails
+              }
+            })
             const recentUsers = allUsers.slice(0, 10)
             
             // Map to activity format
@@ -369,7 +377,10 @@ const Dashboard = () => {
               // Get numeric user ID
               const numericUserId = userData.numericUserId || userData.numeric_user_id || userData.userNumericId || 'N/A'
               
-              // Get timestamp
+              // Get phone number - check multiple field names (match initial load logic)
+              const phone = userData.phone || userData.phoneNumber || userData.userPhone || userData.user_phone || userData.mobile || userData.mobileNumber || null
+              
+              // Get timestamp - handle both Timestamp and Date objects (match initial load logic)
               let timestamp = 'Recently'
               try {
                 timestamp = item.createdAt.toLocaleString()
@@ -381,6 +392,7 @@ const Dashboard = () => {
                 id: item.id,
                 user: userName,
                 numericUserId: numericUserId,
+                phone: phone,
                 action: 'New user registered',
                 type: 'login',
                 time: timestamp
@@ -451,6 +463,7 @@ const Dashboard = () => {
           
           setStats(prevStats => ({
             ...prevStats,
+            totalUsers: snapshot.size, // Update total users count in real-time
             approvedHosts: approvedCount,
             activeUsers: activeUsersCount
           }))
@@ -460,6 +473,7 @@ const Dashboard = () => {
           if (isMounted) {
             setStats(prevStats => ({
               ...prevStats,
+              totalUsers: prevStats.totalUsers || 0, // Keep existing count on error
               approvedHosts: 0,
               activeUsers: 0
             }))
