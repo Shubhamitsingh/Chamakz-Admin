@@ -377,7 +377,7 @@ const Login = () => {
       </div>
 
       {/* Right Side - Login Form (1/3 width) */}
-      <div className="flex-1 lg:flex-none lg:w-1/3 flex items-center justify-center bg-white dark:bg-gray-900 p-6 lg:p-12 relative overflow-hidden">
+      <div className="flex-1 lg:flex-none lg:w-1/3 flex items-center justify-center bg-white dark:bg-gray-900 p-6 lg:p-12 relative overflow-hidden z-10">
         {/* Subtle background elements */}
         <div className="absolute inset-0 opacity-5">
           <div className="absolute top-10 right-10 w-32 h-32 border border-gray-300 dark:border-gray-700 rounded-full" />
@@ -431,7 +431,9 @@ const Login = () => {
           {/* Login Form */}
           <form 
             onSubmit={handleSubmit} 
-            className="space-y-6"
+            className="space-y-6 relative z-10"
+            style={{ position: 'relative', zIndex: 10 }}
+            onClick={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Email Field */}
@@ -550,10 +552,19 @@ const Login = () => {
             <button
               type="submit"
               disabled={loading || !formData.email || !formData.password || !!emailError}
-              className="w-full bg-pink-600 hover:bg-pink-700 active:bg-pink-800 text-white font-semibold py-3.5 px-6 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed enabled:cursor-pointer enabled:hover:shadow-lg flex items-center justify-center gap-2 shadow-md"
+              onClick={(e) => {
+                // Ensure button click is handled
+                if (loading || !formData.email || !formData.password || !!emailError) {
+                  e.preventDefault()
+                  return
+                }
+                e.stopPropagation()
+              }}
+              className="w-full bg-pink-600 hover:bg-pink-700 active:bg-pink-800 text-white font-semibold py-3.5 px-6 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed enabled:cursor-pointer enabled:hover:shadow-lg flex items-center justify-center gap-2 shadow-md relative z-10"
               style={{ 
-                pointerEvents: (loading || !formData.email || !formData.password || !!emailError) ? 'none' : 'auto',
-                WebkitTapHighlightColor: 'transparent'
+                WebkitTapHighlightColor: 'transparent',
+                position: 'relative',
+                zIndex: 10
               }}
             >
               {loading ? (
