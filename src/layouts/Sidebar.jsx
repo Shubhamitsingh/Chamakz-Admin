@@ -11,6 +11,7 @@ import {
   Settings,
   LogOut,
   ChevronLeft,
+  ChevronRight,
   MessageCircle,
   UsersRound,
   Image as BannerIcon,
@@ -63,24 +64,37 @@ const Sidebar = () => {
         style={{ boxShadow: 'none' }}
       >
         <div className="flex flex-col h-full">
-          {/* Logo */}
-          <div className="h-16 flex items-center px-4 border-b-2 border-gray-200 dark:border-gray-700 relative overflow-hidden">
+          {/* Logo & Toggle Button */}
+          <div className="h-16 flex items-center justify-between px-4 border-b-2 border-gray-200 dark:border-gray-700 relative overflow-hidden">
             {/* 2D Decorative Element */}
             <div className="absolute top-0 right-0 w-20 h-20 bg-pink-200 dark:bg-pink-900/20 rounded-full blur-2xl opacity-30"></div>
             <motion.div
               initial={false}
-              animate={{ opacity: sidebarOpen ? 1 : 0 }}
-              className="flex items-center gap-2 relative z-10"
+              animate={{ opacity: sidebarOpen ? 1 : 0, width: sidebarOpen ? 'auto' : 0 }}
+              className="flex items-center gap-2 relative z-10 overflow-hidden"
             >
-              <div className="w-10 h-10 bg-pink-500 rounded-xl flex items-center justify-center border-2 border-pink-600 overflow-hidden" style={{ transform: 'rotate(-5deg)', boxShadow: 'none' }}>
+              <div className="w-10 h-10 bg-pink-500 rounded-xl flex items-center justify-center border-2 border-pink-600 overflow-hidden flex-shrink-0" style={{ transform: 'rotate(-5deg)', boxShadow: 'none' }}>
                 <img 
                   src="/adminlogo.png" 
                   alt="Chamakz Admin Logo" 
                   className="w-full h-full object-contain"
                 />
               </div>
-              {sidebarOpen && <span className="font-bold text-xl">Chamakz Admin</span>}
+              {sidebarOpen && <span className="font-bold text-xl whitespace-nowrap">Chamakz Admin</span>}
             </motion.div>
+            
+            {/* Toggle Button */}
+            <button
+              onClick={toggleSidebar}
+              className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-pink-100 dark:hover:bg-pink-900/20 text-gray-600 dark:text-gray-400 hover:text-pink-600 dark:hover:text-pink-400 transition-colors relative z-10 flex-shrink-0"
+              aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+            >
+              {sidebarOpen ? (
+                <ChevronLeft className="w-5 h-5" />
+              ) : (
+                <ChevronRight className="w-5 h-5" />
+              )}
+            </button>
           </div>
 
           {/* Menu Items */}
@@ -131,13 +145,6 @@ const Sidebar = () => {
           </div>
         </div>
       </motion.aside>
-      
-      {/* Spacer */}
-      <motion.div
-        initial={false}
-        animate={{ width: sidebarOpen ? 280 : 80 }}
-        className="flex-shrink-0"
-      />
     </>
   )
 }

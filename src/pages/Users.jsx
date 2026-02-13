@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Filter, Eye, Ban, CheckCircle, Users as UsersIcon, AlertCircle, Video, VideoOff } from 'lucide-react'
+import { Filter, Eye, Ban, CheckCircle, Users as UsersIcon, AlertCircle, Video, VideoOff, Activity } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import SearchBar from '../components/SearchBar'
 import Table from '../components/Table'
@@ -295,7 +295,20 @@ const Users = () => {
       (user.phone || '').toLowerCase().includes(searchLower) ||
       (user.numericUserId || '').toLowerCase().includes(searchLower)
     
-    const matchesStatusFilter = filterStatus === 'All' || user.status === filterStatus
+    // Filter by status (includes Active, Blocked, Currently Using App)
+    let matchesStatusFilter = true
+    if (filterStatus !== 'All') {
+      if (filterStatus === 'Active' || filterStatus === 'Blocked') {
+        matchesStatusFilter = user.status === filterStatus
+      } else if (filterStatus === 'Currently Using App') {
+        // User must have lastActive and it must be within last 5 minutes
+        const now = new Date()
+        const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000)
+        matchesStatusFilter = user.lastActive && 
+                             user.lastActive instanceof Date && 
+                             user.lastActive >= fiveMinutesAgo
+      }
+    }
     
     const matchesLiveFilter = filterLiveApproval === 'All' || 
       (filterLiveApproval === 'Approved' && user.isActive === true) ||
@@ -746,6 +759,7 @@ const Users = () => {
               <option value="All">All Status</option>
               <option value="Active">Active</option>
               <option value="Blocked">Blocked</option>
+              <option value="Currently Using App">Currently Using App</option>
             </select>
             <select
               value={filterLiveApproval}
