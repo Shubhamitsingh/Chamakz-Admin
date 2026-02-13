@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Mail, Lock, Eye, EyeOff, LogIn, AlertCircle, CheckCircle, TrendingUp, ShoppingCart } from 'lucide-react'
-import { loginAdmin, resetPassword } from '../firebase/auth'
+import { loginAdmin, resetPassword, getCurrentUser } from '../firebase/auth'
 import { useNavigate } from 'react-router-dom'
 
 const Login = () => {
@@ -24,29 +24,94 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    e.stopPropagation() // Prevent event bubbling
+    
+    // Clear previous errors
     setError('')
+    setEmailError('')
+    
+    // Validate email format before submitting
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!formData.email || !emailRegex.test(formData.email)) {
+      setEmailError('Please enter a valid email address.')
+      return
+    }
+    
+    if (!formData.password) {
+      setError('Please enter your password.')
+      return
+    }
+    
     setLoading(true)
 
-    const result = await loginAdmin(formData.email, formData.password)
+    try {
+      console.log('🔐 Attempting login with:', formData.email)
+      const result = await loginAdmin(formData.email, formData.password)
+      console.log('🔐 Login result:', result)
 
-    if (result.success) {
-      // Save remember me preference
-      if (rememberMe) {
-        localStorage.setItem('rememberMe', 'true')
-        localStorage.setItem('rememberedEmail', formData.email)
+      if (result.success) {
+        console.log('✅ Login successful!')
+        
+        // Save remember me preference
+        if (rememberMe) {
+          localStorage.setItem('rememberMe', 'true')
+          localStorage.setItem('rememberedEmail', formData.email)
+        } else {
+          localStorage.removeItem('rememberMe')
+          localStorage.removeItem('rememberedEmail')
+        }
+        
+        // Wait for auth state to update, then redirect
+        // Check auth state multiple times to ensure it's updated
+        let attempts = 0
+        const maxAttempts = 10
+        const checkAuthAndRedirect = () => {
+          attempts++
+          const currentUser = getCurrentUser()
+          console.log('🔍 Checking auth state, attempt:', attempts, 'User:', currentUser ? 'Found' : 'Not found')
+          
+          if (currentUser) {
+            console.log('✅ Auth state confirmed! Redirecting to dashboard...')
+            navigate('/dashboard', { replace: true })
+          } else if (attempts < maxAttempts) {
+            // Wait 100ms and check again
+            setTimeout(checkAuthAndRedirect, 100)
+          } else {
+            // Fallback: redirect anyway after max attempts
+            console.log('⚠️ Auth state not updated, redirecting anyway...')
+            navigate('/dashboard', { replace: true })
+          }
+        }
+        
+        // Start checking after a short delay
+        setTimeout(checkAuthAndRedirect, 200)
       } else {
-        localStorage.removeItem('rememberMe')
-        localStorage.removeItem('rememberedEmail')
+        // Show error message with better formatting
+        const errorMessage = result.error || 'Login failed. Please check your credentials.'
+        console.error('❌ Login failed:', errorMessage)
+        
+        // Format Firebase error messages for user
+        let userFriendlyError = errorMessage
+        if (errorMessage.includes('auth/user-not-found')) {
+          userFriendlyError = 'No account found with this email address.'
+        } else if (errorMessage.includes('auth/wrong-password')) {
+          userFriendlyError = 'Incorrect password. Please try again.'
+        } else if (errorMessage.includes('auth/invalid-email')) {
+          userFriendlyError = 'Invalid email address format.'
+        } else if (errorMessage.includes('auth/too-many-requests')) {
+          userFriendlyError = 'Too many failed attempts. Please try again later.'
+        } else if (errorMessage.includes('auth/network-request-failed')) {
+          userFriendlyError = 'Network error. Please check your internet connection.'
+        }
+        
+        setError(userFriendlyError)
+        setLoading(false)
       }
-      
-      // Login successful - redirect to dashboard
-      navigate('/dashboard')
-    } else {
-      // Show error message
-      setError(result.error || 'Login failed. Please check your credentials.')
+    } catch (error) {
+      console.error('❌ Login error:', error)
+      setError('An unexpected error occurred. Please try again.')
+      setLoading(false)
     }
-
-    setLoading(false)
   }
 
   const handlePasswordReset = async (e) => {
@@ -77,16 +142,21 @@ const Login = () => {
 
   const handleChange = (e) => {
     const value = e.target.value
-    setFormData({
-      ...formData,
-      [e.target.name]: value,
-    })
+    const fieldName = e.target.name
+    
+    // Update form data
+    setFormData(prev => ({
+      ...prev,
+      [fieldName]: value,
+    }))
+    
     setError('') // Clear error when user types
     
-    // Email validation
-    if (e.target.name === 'email') {
+    // Email validation (only validate when user has typed something)
+    if (fieldName === 'email') {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      if (value && !emailRegex.test(value)) {
+      // Only show error if user has typed something and it's invalid
+      if (value.length > 0 && !emailRegex.test(value)) {
         setEmailError('Email is invalid.')
       } else {
         setEmailError('')
@@ -334,39 +404,89 @@ const Login = () => {
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-3"
+              className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-700 rounded-lg flex items-start gap-3"
             >
               <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p className="text-sm font-medium text-red-800 dark:text-red-300">
                   {error}
                 </p>
+                <p className="text-xs text-red-600 dark:text-red-400 mt-1">Please check your credentials and try again.</p>
               </div>
             </motion.div>
           )}
 
+          {/* Success Message (shown briefly before redirect) */}
+          {loading && !error && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border-2 border-green-300 dark:border-green-700 rounded-lg flex items-center gap-3"
+            >
+              <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+              <p className="text-sm font-medium text-green-800 dark:text-green-300">Login successful! Redirecting to dashboard...</p>
+            </motion.div>
+          )}
+
           {/* Login Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form 
+            onSubmit={handleSubmit} 
+            className="space-y-6"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Email Field */}
             <div>
               <label className={`block text-sm font-medium mb-2 ${emailError ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}>
                 Email
               </label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="admin@chamak.com"
-                className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none transition-colors ${
-                  emailError
-                    ? 'border-red-500 focus:border-red-500 dark:bg-white dark:text-gray-900'
-                    : 'border-gray-300 dark:border-gray-600 focus:border-pink-500 dark:bg-white dark:text-gray-900'
-                }`}
-                required
-                autoComplete="email"
-                disabled={loading}
-              />
+              <div className="relative">
+                <input
+                  type="email"
+                  name="email"
+                  id="login-email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  onInput={handleChange}
+                  onFocus={(e) => {
+                    // Select all text on focus for easy manual editing
+                    e.target.select()
+                  }}
+                  placeholder="admin@chamak.com"
+                  className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none transition-colors ${
+                    emailError
+                      ? 'border-red-500 focus:border-red-500 dark:bg-white dark:text-gray-900'
+                      : 'border-gray-300 dark:border-gray-600 focus:border-pink-500 dark:bg-white dark:text-gray-900'
+                  }`}
+                  required
+                  autoComplete="off"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  spellCheck="false"
+                  disabled={loading}
+                  readOnly={false}
+                  style={{ WebkitAppearance: 'none', cursor: 'text' }}
+                />
+                {formData.email && !loading && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, email: '' }))
+                      setEmailError('')
+                      // Focus back to email field after clearing
+                      setTimeout(() => {
+                        const emailInput = document.getElementById('login-email')
+                        if (emailInput) emailInput.focus()
+                      }, 10)
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                    aria-label="Clear email"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
               {emailError && (
                 <p className="mt-1 text-sm text-red-600 dark:text-red-400">{emailError}</p>
               )}
@@ -429,8 +549,12 @@ const Login = () => {
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={loading || !!emailError}
-              className="w-full bg-pink-600 hover:bg-pink-700 text-white font-semibold py-3.5 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md"
+              disabled={loading || !formData.email || !formData.password || !!emailError}
+              className="w-full bg-pink-600 hover:bg-pink-700 active:bg-pink-800 text-white font-semibold py-3.5 px-6 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed enabled:cursor-pointer enabled:hover:shadow-lg flex items-center justify-center gap-2 shadow-md"
+              style={{ 
+                pointerEvents: (loading || !formData.email || !formData.password || !!emailError) ? 'none' : 'auto',
+                WebkitTapHighlightColor: 'transparent'
+              }}
             >
               {loading ? (
                 <>
