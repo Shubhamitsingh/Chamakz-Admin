@@ -293,6 +293,7 @@ const Users = () => {
     const matchesSearch = 
       (user.name || '').toLowerCase().includes(searchLower) ||
       (user.phone || '').toLowerCase().includes(searchLower) ||
+      (user.email || '').toLowerCase().includes(searchLower) ||
       (user.numericUserId || '').toLowerCase().includes(searchLower)
     
     // Filter by status (includes Active, Blocked, Currently Using App)
@@ -371,6 +372,18 @@ const Users = () => {
               <p className="font-medium">{name}</p>
               <p className="text-xs text-gray-500">{phoneDisplay}</p>
             </div>
+          </div>
+        )
+      },
+    },
+    {
+      header: 'Email',
+      accessor: 'email',
+      render: (row) => {
+        const email = row?.email || 'No email'
+        return (
+          <div>
+            <p className="text-sm font-medium">{email !== 'No email' ? email : <span className="text-gray-400 italic">No email</span>}</p>
           </div>
         )
       },
@@ -744,7 +757,7 @@ const Users = () => {
         <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
           <div className="flex-1">
             <SearchBar
-              placeholder="Search by name, phone number, or numeric user ID..."
+              placeholder="Search by name, email, phone number, or numeric user ID..."
               value={searchTerm}
               onChange={setSearchTerm}
             />
@@ -842,6 +855,11 @@ const Users = () => {
               <div>
                 <h3 className="text-2xl font-bold">{selectedUser.name || 'Unknown User'}</h3>
                 <p className="text-gray-600 dark:text-gray-400">
+                  {selectedUser.email && selectedUser.email !== 'No email' 
+                    ? selectedUser.email 
+                    : 'No email'}
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
                   {selectedUser.phone && selectedUser.phone !== 'No phone' 
                     ? `Ph: ${selectedUser.phone}` 
                     : 'No phone'}
@@ -857,6 +875,14 @@ const Users = () => {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Email</p>
+                <p className="font-medium">{selectedUser.email && selectedUser.email !== 'No email' ? selectedUser.email : 'No email'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Phone</p>
+                <p className="font-medium">{selectedUser.phone && selectedUser.phone !== 'No phone' ? selectedUser.phone : 'No phone'}</p>
+              </div>
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Role</p>
                 <p className="font-medium">{selectedUser.role || 'User'}</p>
