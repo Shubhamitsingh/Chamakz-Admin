@@ -632,6 +632,31 @@ export const useDashboardData = ({ preset, customStart, customEnd, countryFilter
       completedWithdrawals: completedWithdrawals.length,
       pendingReports: pendingReports.length,
       highPriorityReports: highPriorityReports.length,
+      recentReports: [...complaints]
+        .sort((a, b) => (toDate(b.createdAt)?.getTime?.() || 0) - (toDate(a.createdAt)?.getTime?.() || 0))
+        .slice(0, 6)
+        .map((item) => ({
+          id: item.id,
+          reported: item.reportedName || item.targetName || 'Unknown',
+          reporter: item.reporterName || 'Anonymous',
+          reason: item.reason || item.category || 'Report',
+          status: String(item.status || 'pending'),
+          priority: String(item.priority || 'medium'),
+          time: toDate(item.createdAt) || toDate(item.timestamp),
+        })),
+      recentTickets: [...tickets]
+        .sort((a, b) => (toDate(b.createdAt)?.getTime?.() || 0) - (toDate(a.createdAt)?.getTime?.() || 0))
+        .slice(0, 4)
+        .map((item) => ({
+          id: item.id,
+          title: item.subject || item.issue || 'Ticket',
+          user: item.userName || 'User',
+          status: String(item.status || 'open'),
+          time: toDate(item.createdAt),
+        })),
+      investigatingReports: complaints.filter((item) =>
+        ['investigating', 'in-progress', 'review'].includes(String(item.status || '').toLowerCase())
+      ).length,
       liveReports: liveReports.length,
       openTickets: openTickets.length,
       openChats: chats.filter((item) => String(item.status || 'active').toLowerCase() !== 'closed').length,

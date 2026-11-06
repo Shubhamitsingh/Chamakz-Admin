@@ -1,685 +1,433 @@
-import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
-import { Filter, Eye, CheckCircle, Clock, AlertCircle, Trash2, Ticket } from 'lucide-react'
-import { useApp } from '../context/AppContext'
-import SearchBar from '../components/SearchBar'
-import Table from '../components/Table'
-import Modal from '../components/Modal'
-import Loader from '../components/Loader'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
+import {
+  CheckCircle,
+  Clock,
+  Hourglass,
+  Lock,
+  MoreHorizontal,
+  Ticket,
+  X,
+} from 'lucide-react'
 import PageHeader from '../components/PageHeader'
 import Panel from '../components/Panel'
-import KpiCard from '../components/KpiCard'
+import SearchBar from '../components/SearchBar'
+import Pagination from '../components/Pagination'
 import EmptyState from '../components/EmptyState'
-import { collection, getDocs, getDoc, doc, updateDoc, deleteDoc, query, collectionGroup, serverTimestamp } from 'firebase/firestore'
-import { db } from '../firebase/config'
+import StatusBadge from '../components/StatusBadge'
+import KpiCard from '../components/KpiCard'
+import Modal from '../components/Modal'
+import ExportButton from '../components/ExportButton'
+import { useApp } from '../context/AppContext'
+import {
+  TICKET_CATEGORIES,
+  TICKET_PRIORITIES,
+  TICKET_STATUSES,
+  addTicketReply,
+  formatWhen,
+  getTicket,
+  listTickets,
+  mutateTicket,
+  priorityTone,
+  statusTone,
+} from '../utils/ticketsData'
+
+const Avatar = ({ name }) => (
+  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-sky-600 text-xs font-semibold text-white">
+    {(name || '?').charAt(0)}
+  </span>
+)
+
+const ActionMenu = ({ items }) => {
+  const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState({ top: 0, left: 0 })
+  const ref = useRef(null)
+  useEffect(() => {
+    const close = (event) => {
+      if (ref.current && !ref.current.contains(event.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [])
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        className="rounded-md p-1 hover:bg-gray-100 dark:hover:bg-gray-700"
+        aria-label="Actions"
+        onClick={(event) => {
+          const box = event.currentTarget.getBoundingClientRect()
+          setPos({ top: box.bottom + 4, left: Math.max(8, box.right - 176) })
+          setOpen((value) => !value)
+        }}
+      >
+        <MoreHorizontal className="h-4 w-4" />
+      </button>
+      {open && (
+        <div className="fixed z-50 w-44 rounded-md border border-gray-200 bg-white py-1 text-xs shadow-sm dark:border-gray-700 dark:bg-gray-800" style={{ top: pos.top, left: pos.left }}>
+          {items.map((item) => (
+            <button key={item.label} type="button" className="block w-full px-3 py-1.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700" onClick={() => { setOpen(false); item.onClick() }}>
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const Field = ({ label, children }) => (
+  <p>
+    <span className="text-[11px] uppercase tracking-wide text-gray-500">{label}</span>
+    <span className="mt-0.5 block text-sm">{children}</span>
+  </p>
+)
 
 const TicketsV2 = () => {
-  const { markTicketsAsSeen, showToast } = useApp()
-  const [activeTab, setActiveTab] = useState('in-progress') // 'in-progress' or 'resolved'
-  const [searchTerm, setSearchTerm] = useState('')
-  const [filterStatus, setFilterStatus] = useState('All')
-  const [selectedTicket, setSelectedTicket] = useState(null)
-  const [showTicketModal, setShowTicketModal] = useState(false)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [ticketToDelete, setTicketToDelete] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [processing, setProcessing] = useState(false)
-  const [tickets, setTickets] = useState([])
-  const [foundIn, setFoundIn] = useState('')
+  const { showToast, markTicketsAsSeen } = useApp()
+  const [tick, setTick] = useState(0)
+  const [search, setSearch] = useState('')
+  const [status, setStatus] = useState('all')
+  const [priority, setPriority] = useState('all')
+  const [category, setCategory] = useState('all')
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
+  const [sortKey, setSortKey] = useState('submittedAt')
+  const [sortDir, setSortDir] = useState('desc')
+  const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(10)
+  const [selectedId, setSelectedId] = useState(null)
+  const [confirm, setConfirm] = useState(null)
+  const [reply, setReply] = useState('')
+  const [note, setNote] = useState('')
+  const [nextStatus, setNextStatus] = useState('In Progress')
+  const [reason, setReason] = useState('')
 
-  useEffect(() => {
-    const fetchTickets = async () => {
-      console.log('🔍 Searching for tickets in Firebase...')
-      setLoading(true)
-      
-      try {
-        // Method 1: Try root collections
-        const rootCollections = [
-          'supportTickets',      // Found in user's Firebase!
-          'tickets', 'support', 'supportRequests', 'support_requests',
-          'contactSupport', 'contact_support', 'helpdesk', 'complaints',
-          'feedback', 'queries', 'issues', 'help'
-        ]
-        
-        for (const collName of rootCollections) {
-          try {
-            const snapshot = await getDocs(collection(db, collName))
-            if (snapshot.size > 0) {
-              console.log(`✅ Found ${snapshot.size} tickets in root collection: ${collName}`)
-              setFoundIn(`Root collection: ${collName}`)
-              const ticketsData = await processTickets(snapshot)
-              setTickets(ticketsData)
-              setLoading(false)
-              return
-            }
-          } catch (error) {
-            // Continue to next collection
-          }
-        }
+  useEffect(() => { markTicketsAsSeen?.() }, [markTicketsAsSeen])
 
-        // Method 2: Try collection groups (subcollections across all users)
-        console.log('🔍 Trying collection groups (subcollections)...')
-        const subCollectionNames = [
-          'tickets', 'support', 'supportRequests', 'support_requests',
-          'contactSupport', 'contact_support', 'helpdesk', 'userTickets'
-        ]
-        
-        for (const collName of subCollectionNames) {
-          try {
-            const q = query(collectionGroup(db, collName))
-            const snapshot = await getDocs(q)
-            if (snapshot.size > 0) {
-              console.log(`✅ Found ${snapshot.size} tickets in subcollection: ${collName}`)
-              console.log('📄 Sample data:', snapshot.docs[0]?.data())
-              setFoundIn(`Subcollection: ${collName} (under users)`)
-              const ticketsData = await processTickets(snapshot)
-              setTickets(ticketsData)
-              setLoading(false)
-              return
-            }
-          } catch (error) {
-            console.log(`Could not access collection group: ${collName}`)
-          }
-        }
+  const rows = useMemo(() => listTickets(), [tick])
+  const selected = selectedId ? getTicket(selectedId) : null
+  const refresh = () => setTick((value) => value + 1)
 
-        // Method 3: Check under specific user paths
-        console.log('🔍 Checking user subcollections...')
-        try {
-          const usersSnapshot = await getDocs(collection(db, 'users'))
-          let allTickets = []
-          
-          for (const userDoc of usersSnapshot.docs.slice(0, 5)) { // Check first 5 users
-            for (const subColl of ['tickets', 'support', 'supportRequests']) {
-              try {
-                const ticketsRef = collection(db, 'users', userDoc.id, subColl)
-                const ticketsSnapshot = await getDocs(ticketsRef)
-                if (ticketsSnapshot.size > 0) {
-                  console.log(`✅ Found tickets under users/${userDoc.id}/${subColl}`)
-                  setFoundIn(`users/{userId}/${subColl}`)
-                  allTickets = [...allTickets, ...ticketsSnapshot.docs]
-                }
-              } catch (error) {
-                // Continue
-              }
-            }
-          }
-          
-          if (allTickets.length > 0) {
-            const ticketsData = await processTickets({ docs: allTickets })
-            setTickets(ticketsData)
-            setLoading(false)
-            return
-          }
-        } catch (error) {
-          console.error('Error checking user subcollections:', error)
-        }
-
-        console.log('⚠️ No tickets found anywhere')
-        setTickets([])
-        setLoading(false)
-        
-      } catch (error) {
-        console.error('Error fetching tickets:', error)
-        setLoading(false)
-      }
-    }
-
-    fetchTickets()
-  }, [])
-
-  // Mark tickets as seen when page loads
-  useEffect(() => {
-    if (!loading && tickets.length >= 0) {
-      // Mark all current tickets as seen
-      markTicketsAsSeen()
-    }
-  }, [loading])
-
-  const processTickets = async (snapshot) => {
-    const ticketsPromises = snapshot.docs.map(async (ticketDoc) => {
-      const data = ticketDoc.data()
-      console.log('Processing ticket:', ticketDoc.id, data)
-      
-      const userId = data.userId || data.uid || data.user_id || ''
-      let numericUserId = data.numericUserId || data.numeric_user_id || data.userNumericId || 'N/A'
-      
-      // If ticket has userId but no numericUserId, fetch it from users collection
-      if (userId && numericUserId === 'N/A') {
-        try {
-          const userRef = doc(db, 'users', userId)
-          const userSnap = await getDoc(userRef)
-          if (userSnap.exists()) {
-            const userData = userSnap.data()
-            numericUserId = userData.numericUserId || 'N/A'
-            console.log('Fetched numericUserId for user:', userId, numericUserId)
-          }
-        } catch (error) {
-          console.log('Could not fetch user data:', error)
-        }
-      }
-      
-      return {
-        id: ticketDoc.id,
-        path: ticketDoc.ref.path,
-        ticketId: ticketDoc.id.substring(0, 8).toUpperCase(),
-        username: data.userName || data.username || data.name || data.userDisplayName || data.fullName || data.user || 'Unknown User',
-        email: data.userEmail || data.email || data.emailAddress || data.contactEmail || 'N/A',
-        userId: userId,
-        numericUserId: numericUserId,
-        issue: data.subject || data.issue || data.title || data.topic || data.issueType || data.ticketTitle || 'No subject',
-        description: data.description || data.message || data.details || data.body || data.content || data.query || data.ticketMessage || 'No description',
-        status: (data.status || data.ticketStatus || data.state || 'open').toLowerCase(),
-        priority: (data.priority || data.ticketPriority || data.urgency || 'medium').toLowerCase(),
-        category: data.category || data.type || data.issueCategory || 'General',
-        assignedTo: data.assignedTo || data.handler || 'Unassigned',
-        created: formatDate(data.createdAt || data.createdDate || data.timestamp || data.created_at),
-        createdTime: formatDateTime(data.createdAt || data.createdDate || data.timestamp || data.created_at),
-        ...data
-      }
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    const list = rows.filter((row) => {
+      if (status !== 'all' && row.status !== status) return false
+      if (priority !== 'all' && row.priority !== priority) return false
+      if (category !== 'all' && row.category !== category) return false
+      if (from && new Date(row.submittedAt) < new Date(from)) return false
+      if (to && new Date(row.submittedAt) > new Date(`${to}T23:59:59`)) return false
+      if (!q) return true
+      return `${row.id} ${row.user.name} ${row.user.numericId} ${row.user.email} ${row.subject} ${row.description}`.toLowerCase().includes(q)
     })
-    
-    const ticketsData = await Promise.all(ticketsPromises)
-    
-    return ticketsData.sort((a, b) => {
-      const dateA = a.createdAt || a.createdDate || a.timestamp || a.created_at
-      const dateB = b.createdAt || b.createdDate || b.timestamp || b.created_at
-      if (!dateA) return 1
-      if (!dateB) return -1
-      return dateB.toDate() - dateA.toDate()
-    })
-  }
-
-  const formatDate = (timestamp) => {
-    if (!timestamp) return 'N/A'
-    try {
-      return new Date(timestamp.toDate()).toLocaleDateString()
-    } catch {
-      return 'N/A'
-    }
-  }
-
-  const formatDateTime = (timestamp) => {
-    if (!timestamp) return 'N/A'
-    try {
-      return new Date(timestamp.toDate()).toLocaleString()
-    } catch {
-      return 'N/A'
-    }
-  }
-
-  const getStatusColor = (status) => {
-    const statusLower = status.toLowerCase()
-    switch (statusLower) {
-      case 'open':
-      case 'new':
-        return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-      case 'in-progress':
-      case 'pending':
-      case 'processing':
-        return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-      case 'resolved':
-      case 'closed':
-      case 'completed':
-        return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-      default:
-        return 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400'
-    }
-  }
-
-  const getPriorityColor = (priority) => {
-    const priorityLower = priority.toLowerCase()
-    switch (priorityLower) {
-      case 'high':
-      case 'urgent':
-        return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-      case 'medium':
-      case 'normal':
-        return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-      case 'low':
-        return 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400'
-      default:
-        return 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400'
-    }
-  }
-
-  const getCategoryColor = (category) => {
-    const categoryLower = (category || 'general').toLowerCase()
-    switch (categoryLower) {
-      case 'technical':
-      case 'tech':
-        return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
-      case 'payment':
-      case 'billing':
-      case 'transaction':
-        return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-      case 'account':
-      case 'profile':
-        return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-      case 'bug':
-      case 'error':
-        return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-      case 'feature':
-      case 'request':
-        return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-      default:
-        return 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400'
-    }
-  }
-
-  const handleUpdateStatus = async (ticketId, newStatus) => {
-    setProcessing(true)
-    try {
-      const ticketRef = doc(db, 'supportTickets', ticketId)
-      await updateDoc(ticketRef, {
-        status: newStatus,
-        updatedAt: serverTimestamp(),
-        ...(newStatus === 'resolved' && { resolvedAt: serverTimestamp() }),
-        ...(newStatus === 'closed' && { closedAt: serverTimestamp() })
-      })
-      
-      console.log('✅ Ticket status updated to:', newStatus)
-      
-      // Close modal and switch to resolved tab if resolved
-      if (newStatus === 'resolved') {
-        setShowTicketModal(false)
-        setActiveTab('resolved')
+    return [...list].sort((a, b) => {
+      if (sortKey === 'submittedAt' || sortKey === 'updatedAt') {
+        const left = new Date(a[sortKey]).getTime()
+        const right = new Date(b[sortKey]).getTime()
+        return sortDir === 'asc' ? left - right : right - left
       }
-    } catch (error) {
-      showToast('Error updating ticket status', 'error')
+      return sortDir === 'asc' ? String(a[sortKey]).localeCompare(String(b[sortKey])) : String(b[sortKey]).localeCompare(String(a[sortKey]))
+    })
+  }, [rows, search, status, priority, category, from, to, sortKey, sortDir])
+
+  useEffect(() => { setPage(1) }, [search, status, priority, category, from, to])
+
+  const counts = {
+    all: rows.length,
+    Open: rows.filter((row) => row.status === 'Open').length,
+    'In Progress': rows.filter((row) => row.status === 'In Progress').length,
+    'Waiting on User': rows.filter((row) => row.status === 'Waiting on User').length,
+    Resolved: rows.filter((row) => row.status === 'Resolved').length,
+    Closed: rows.filter((row) => row.status === 'Closed').length,
+  }
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
+  const pageRows = filtered.slice((page - 1) * perPage, page * perPage)
+
+  const applyStatus = (id, next, detail) => {
+    const extra = {}
+    if (next === 'Resolved') extra.resolvedAt = new Date()
+    if (next === 'Closed') extra.closedAt = new Date()
+    if (detail && (next === 'Resolved' || next === 'Closed')) extra.resolution = detail
+    mutateTicket(id, { status: next, ...extra }, { actor: 'Admin User', action: detail || `Status → ${next}`, status: next })
+    refresh()
+    showToast(`Sample ticket marked ${next}`, 'success')
+  }
+
+  const runConfirm = () => {
+    if (!confirm) return
+    const row = getTicket(confirm.id)
+    if (!row) return
+    if (confirm.kind === 'status') {
+      if ((nextStatus === 'Resolved' || nextStatus === 'Closed') && !reason.trim()) {
+        showToast('Add a short resolution note', 'error')
+        return
+      }
+      applyStatus(confirm.id, nextStatus, reason.trim())
+      setConfirm(null)
+      setReason('')
+      return
     }
-    setProcessing(false)
+    setConfirm(null)
+    refresh()
   }
 
-  const handleDeleteTicket = (ticketId) => {
-    setTicketToDelete(ticketId)
-    setShowDeleteConfirm(true)
-  }
-
-  const confirmDeleteTicket = async () => {
-    if (!ticketToDelete) return
-
-    setProcessing(true)
-    setShowDeleteConfirm(false)
-    try {
-      const ticketRef = doc(db, 'supportTickets', ticketToDelete)
-      await deleteDoc(ticketRef)
-      setShowTicketModal(false)
-      setTicketToDelete(null)
-      showToast('Ticket deleted successfully!', 'success')
-    } catch (error) {
-      showToast('Error deleting ticket', 'error')
+  const sendReply = (internal) => {
+    const text = internal ? note.trim() : reply.trim()
+    if (!selected || !text) {
+      showToast('Write a message first', 'error')
+      return
     }
-    setProcessing(false)
+    addTicketReply(selected.id, text, internal)
+    setReply('')
+    setNote('')
+    refresh()
+    showToast(internal ? 'Internal note saved on this sample' : 'Reply saved on this sample. No email was sent.', 'success')
   }
 
-  // Separate tickets based on status
-  const inProgressTickets = tickets.filter(ticket => {
-    const isInProgress = !['resolved', 'closed', 'completed'].includes(ticket.status.toLowerCase())
-    return isInProgress
-  })
-
-  const resolvedTickets = tickets.filter(ticket => {
-    const isResolved = ['resolved', 'closed', 'completed'].includes(ticket.status.toLowerCase())
-    return isResolved
-  })
-
-  // Filter based on active tab and search
-  const currentTabTickets = activeTab === 'in-progress' ? inProgressTickets : resolvedTickets
-  
-  const filteredTickets = currentTabTickets.filter(ticket => {
-    const searchLower = searchTerm.toLowerCase()
-    const matchesSearch = 
-      ticket.username.toLowerCase().includes(searchLower) ||
-      ticket.ticketId.toLowerCase().includes(searchLower) ||
-      ticket.issue.toLowerCase().includes(searchLower) ||
-      ticket.email.toLowerCase().includes(searchLower) ||
-      (ticket.category || 'general').toLowerCase().includes(searchLower)
-    
-    return matchesSearch
-  })
-
-  const statusCounts = {
-    all: tickets.length,
-    inProgress: inProgressTickets.length,
-    resolved: resolvedTickets.length,
-  }
-
-  const columns = [
-    { 
-      header: 'Ticket ID', 
-      accessor: 'ticketId',
-      render: (row) => (
-        <span className="font-mono font-semibold text-gray-900 dark:text-gray-100">
-          #{row.ticketId}
-        </span>
-      )
-    },
-    {
-      header: 'User',
-      accessor: 'username',
-      render: (row) => (
-        <div>
-          <p className="font-medium">{row.username}</p>
-          <p className="text-xs text-gray-900 dark:text-gray-100 font-mono font-bold">
-            ID: {row.numericUserId}
-          </p>
-          {row.email !== 'N/A' && (
-            <p className="text-xs text-gray-500">{row.email}</p>
-          )}
-        </div>
-      ),
-    },
-    { 
-      header: 'Issue', 
-      accessor: 'issue',
-      render: (row) => (
-        <div className="max-w-xs">
-          <p className="truncate font-medium">{row.issue}</p>
-          <p className="text-xs text-gray-500 truncate">{row.description}</p>
-        </div>
-      )
-    },
-    {
-      header: 'Category',
-      accessor: 'category',
-      render: (row) => (
-        <span className={`px-2 py-0.5 rounded-md text-[11px] font-medium capitalize ${getCategoryColor(row.category)}`}>
-          {row.category || 'General'}
-        </span>
-      ),
-    },
-    {
-      header: 'Status',
-      accessor: 'status',
-      render: (row) => (
-        <span className={`px-2 py-0.5 rounded-md text-[11px] font-medium capitalize ${getStatusColor(row.status)}`}>
-          {row.status}
-        </span>
-      ),
-    },
-    {
-      header: 'Priority',
-      accessor: 'priority',
-      render: (row) => (
-        <span className={`px-2 py-0.5 rounded-md text-[11px] font-medium capitalize ${getPriorityColor(row.priority)}`}>
-          {row.priority}
-        </span>
-      ),
-    },
-    { header: 'Created', accessor: 'created' },
-    {
-      header: 'Actions',
-      render: (row) => (
-        <div className="flex gap-2">
-          <button
-            onClick={() => {
-              setSelectedTicket(row)
-              setShowTicketModal(true)
-            }}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-            title="View Details"
-          >
-            <Eye className="w-4 h-4" />
-          </button>
-          {(row.status === 'resolved' || row.status === 'closed') && (
-            <button
-              onClick={() => handleDeleteTicket(row.id)}
-              className="p-2 hover:bg-red-100 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-              title="Delete Ticket"
-            >
-              <Trash2 className="w-4 h-4 text-red-600" />
-            </button>
-          )}
-        </div>
-      ),
-    },
+  const exportRows = filtered.map((row) => ({
+    id: row.id,
+    user: `${row.user.name} (${row.user.numericId})`,
+    email: row.user.email,
+    subject: row.subject,
+    category: row.category,
+    priority: row.priority,
+    status: row.status,
+  }))
+  const exportColumns = [
+    { header: 'Ticket ID', accessor: 'id' },
+    { header: 'User', accessor: 'user' },
+    { header: 'Email', accessor: 'email' },
+    { header: 'Subject', accessor: 'subject' },
+    { header: 'Category', accessor: 'category' },
+    { header: 'Priority', accessor: 'priority' },
+    { header: 'Status', accessor: 'status' },
   ]
 
-  if (loading) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <Loader />
-      </div>
-    )
-  }
+  const kpis = [
+    { id: 'all', title: 'Total tickets', value: counts.all, icon: Ticket, tone: 'blue' },
+    { id: 'Open', title: 'Open', value: counts.Open, icon: Clock, tone: 'amber' },
+    { id: 'In Progress', title: 'In progress', value: counts['In Progress'], icon: Hourglass, tone: 'sky' },
+    { id: 'Waiting on User', title: 'Waiting', value: counts['Waiting on User'], icon: Clock, tone: 'slate' },
+    { id: 'Resolved', title: 'Resolved', value: counts.Resolved, icon: CheckCircle, tone: 'emerald' },
+    { id: 'Closed', title: 'Closed', value: counts.Closed, icon: Lock, tone: 'indigo' },
+  ]
 
   return (
-    <div className="page-shell">
+    <div className="space-y-4">
       <PageHeader
         title="Tickets / Support"
-        description={foundIn ? `Manage support tickets. Source: ${foundIn}` : 'Manage and resolve customer support tickets.'}
+        description="Sample helpdesk queue. Replies and status changes stay on this page — no live user messages are sent."
       />
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-        <KpiCard title="Total tickets" value={statusCounts.all} icon={Ticket} />
-        <KpiCard title="In progress" value={statusCounts.inProgress} icon={Clock} />
-        <KpiCard title="Resolved" value={statusCounts.resolved} icon={CheckCircle} />
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+        {kpis.map((card) => (
+          <button key={card.id} type="button" className={`text-left ${status === card.id ? 'rounded-lg ring-1 ring-gray-900' : ''}`} onClick={() => setStatus(card.id)}>
+            <KpiCard title={card.title} value={card.value} icon={card.icon} tone={card.tone} />
+          </button>
+        ))}
       </div>
 
-      {/* Tabs */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 relative z-10"
-      >
-        <div className="flex gap-4 border-b border-gray-200 dark:border-gray-700">
-          <button
-            onClick={() => setActiveTab('in-progress')}
-            className={`flex items-center gap-2 px-4 py-3 font-medium transition-colors relative ${
-              activeTab === 'in-progress'
-                ? 'text-gray-900 dark:text-gray-100'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-            }`}
-          >
-            <Clock className="w-5 h-5" />
-            In Progress
-            <span className="ml-1 px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded-full text-xs font-bold">
-              {statusCounts.inProgress}
-            </span>
-            {activeTab === 'in-progress' && (
-              <motion.div
-                layoutId="ticketTab"
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-900 dark:bg-white"
-              />
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab('resolved')}
-            className={`flex items-center gap-2 px-4 py-3 font-medium transition-colors relative ${
-              activeTab === 'resolved'
-                ? 'text-gray-900 dark:text-gray-100'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-            }`}
-          >
-            <CheckCircle className="w-5 h-5" />
-            Resolved
-            <span className="ml-1 px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-xs font-bold">
-              {statusCounts.resolved}
-            </span>
-            {activeTab === 'resolved' && (
-              <motion.div
-                layoutId="ticketTab"
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-900 dark:bg-white"
-              />
-            )}
-          </button>
+      <Panel padded={false}>
+        <div className="flex flex-wrap gap-2 p-3">
+          <SearchBar placeholder="Search ID, user, email, or subject" value={search} onChange={setSearch} />
+          <select className="input-field max-w-[140px]" value={priority} onChange={(e) => setPriority(e.target.value)}>
+            <option value="all">All priority</option>
+            {TICKET_PRIORITIES.map((item) => <option key={item}>{item}</option>)}
+          </select>
+          <select className="input-field max-w-[190px]" value={category} onChange={(e) => setCategory(e.target.value)}>
+            <option value="all">All categories</option>
+            {TICKET_CATEGORIES.map((item) => <option key={item}>{item}</option>)}
+          </select>
+          <input className="input-field max-w-[140px]" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+          <input className="input-field max-w-[140px]" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          <ExportButton data={exportRows} columns={exportColumns} filename="tickets" disabled={exportRows.length === 0} />
         </div>
-
-        {/* Search Bar */}
-        <div className="pt-4">
-          <SearchBar
-            placeholder="Search by ticket ID, user, or issue..."
-            value={searchTerm}
-            onChange={setSearchTerm}
-          />
-        </div>
-      </motion.div>
-
-      {/* Tickets Table */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }} 
-        animate={{ opacity: 1, y: 0 }} 
-        transition={{ delay: 0.1 }} 
-        className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 relative z-10"
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold flex items-center gap-2">
-            <div className="w-1 h-4 bg-gray-900 dark:bg-white rounded-full"></div>
-            {activeTab === 'in-progress' ? 'In Progress Tickets' : 'Resolved Tickets'} ({filteredTickets.length})
-          </h2>
-        </div>
-        {filteredTickets.length === 0 ? (
-          <EmptyState
-            icon={activeTab === 'in-progress' ? Clock : CheckCircle}
-            title={activeTab === 'in-progress' 
-              ? 'No pending tickets' 
-              : 'No resolved tickets'}
-            description={activeTab === 'in-progress' 
-              ? 'Great job! All tickets have been resolved. New support tickets will appear here when users submit them.'
-              : 'Resolved tickets will appear here once you mark tickets as resolved.'}
-          />
+        {pageRows.length === 0 ? (
+          <EmptyState title="No tickets in this view" description="Try another status card or clear filters." />
         ) : (
-          <Table columns={columns} data={filteredTickets} />
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 text-left text-[11px] uppercase tracking-wide text-gray-500 dark:border-gray-700">
+                  <th className="cursor-pointer px-3 py-2" onClick={() => { setSortKey('id'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc') }}>Ticket ID</th>
+                  <th className="px-3 py-2">User</th>
+                  <th className="px-3 py-2">Subject</th>
+                  <th className="px-3 py-2">Category</th>
+                  <th className="px-3 py-2">Priority</th>
+                  <th className="px-3 py-2">Status</th>
+                  <th className="cursor-pointer px-3 py-2" onClick={() => { setSortKey('submittedAt'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc') }}>Created</th>
+                  <th className="px-3 py-2">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pageRows.map((row) => (
+                  <tr key={row.id} className="border-b border-gray-50 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-700/40">
+                    <td className="px-3 py-2 font-mono text-[11px]">{row.id}</td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <Avatar name={row.user.name} />
+                        <div>
+                          <p className="font-medium">{row.user.name}</p>
+                          <p className="font-mono text-[11px] text-gray-500">{row.user.numericId}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="max-w-[220px] px-3 py-2">
+                      <p className="truncate font-medium">{row.subject}</p>
+                      <p className="truncate text-[11px] text-gray-500">{row.description}</p>
+                    </td>
+                    <td className="px-3 py-2 text-xs">{row.category}</td>
+                    <td className="px-3 py-2"><StatusBadge tone={priorityTone(row.priority)}>{row.priority}</StatusBadge></td>
+                    <td className="px-3 py-2"><StatusBadge tone={statusTone(row.status)}>{row.status}</StatusBadge></td>
+                    <td className="px-3 py-2 text-xs">{formatWhen(row.submittedAt)}</td>
+                    <td className="px-3 py-2">
+                      <ActionMenu
+                        items={[
+                          { label: 'View', onClick: () => setSelectedId(row.id) },
+                          { label: 'Update status', onClick: () => { setSelectedId(row.id); setNextStatus(row.status); setReason(''); setConfirm({ kind: 'status', id: row.id }) } },
+                        ]}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-      </motion.div>
+        <div className="border-t border-gray-100 p-3 dark:border-gray-700">
+          <Pagination currentPage={page} totalPages={totalPages} totalItems={filtered.length} itemsPerPage={perPage} onPageChange={setPage} onItemsPerPageChange={(value) => { setPerPage(value); setPage(1) }} />
+        </div>
+      </Panel>
 
-      {/* Ticket Detail Modal */}
-      <Modal
-        isOpen={showTicketModal}
-        onClose={() => setShowTicketModal(false)}
-        title="Ticket Details"
-      >
-        {selectedTicket && (
-          <div className="space-y-6">
-            <div className="flex items-start justify-between">
+      {selected && (
+        <div className="fixed inset-0 z-40 flex justify-end">
+          <button type="button" className="absolute inset-0 bg-black/30" aria-label="Close" onClick={() => setSelectedId(null)} />
+          <aside className="relative z-50 flex h-full w-full max-w-xl flex-col overflow-y-auto border-l border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+            <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-gray-700">
               <div>
-                <h3 className="text-sm font-semibold mb-1">{selectedTicket.issue}</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Ticket #{selectedTicket.ticketId}</p>
-                <p className="text-xs text-gray-500 mt-1 font-mono">{selectedTicket.path}</p>
+                <p className="font-mono text-xs text-gray-500">{selected.id}</p>
+                <h2 className="text-sm font-semibold">{selected.subject}</h2>
               </div>
-              <div className="flex gap-2">
-                <span className={`px-2 py-0.5 rounded-md text-[11px] font-medium capitalize ${getStatusColor(selectedTicket.status)}`}>
-                  {selectedTicket.status}
-                </span>
-                <span className={`px-2 py-0.5 rounded-md text-[11px] font-medium capitalize ${getPriorityColor(selectedTicket.priority)}`}>
-                  {selectedTicket.priority}
-                </span>
+              <div className="flex items-center gap-2">
+                <StatusBadge tone={statusTone(selected.status)}>{selected.status}</StatusBadge>
+                <button type="button" className="rounded-md p-1 hover:bg-gray-100" onClick={() => setSelectedId(null)}><X className="h-4 w-4" /></button>
               </div>
             </div>
+            <div className="space-y-3 p-4">
+              <Panel title="Ticket">
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Priority"><StatusBadge tone={priorityTone(selected.priority)}>{selected.priority}</StatusBadge></Field>
+                  <Field label="Category">{selected.category}</Field>
+                  <Field label="Created">{formatWhen(selected.submittedAt)}</Field>
+                  <Field label="Updated">{formatWhen(selected.updatedAt)}</Field>
+                  {selected.resolvedAt && <Field label="Resolved">{formatWhen(selected.resolvedAt)}</Field>}
+                </div>
+                <p className="mt-3 whitespace-pre-wrap rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900/40">{selected.description}</p>
+                {selected.resolution && <p className="mt-2 text-xs text-emerald-700">Resolution: {selected.resolution}</p>}
+              </Panel>
 
-            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-              <h4 className="font-semibold mb-2">User Information</h4>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div>
-                  <span className="text-gray-600 dark:text-gray-400">Name:</span>
-                  <span className="ml-2 font-medium">{selectedTicket.username}</span>
-                </div>
-                <div>
-                  <span className="text-gray-600 dark:text-gray-400">User ID:</span>
-                  <span className="ml-2 font-bold text-gray-900 dark:text-gray-100 font-mono">
-                    {selectedTicket.numericUserId}
-                  </span>
-                </div>
-                {selectedTicket.email !== 'N/A' && (
+              <Panel title="User">
+                <div className="flex items-center gap-2">
+                  <Avatar name={selected.user.name} />
                   <div>
-                    <span className="text-gray-600 dark:text-gray-400">Email:</span>
-                    <span className="ml-2 font-medium">{selectedTicket.email}</span>
+                    <p className="text-sm font-medium">{selected.user.name}</p>
+                    <p className="font-mono text-[11px] text-gray-500">{selected.user.numericId} · {selected.user.role}</p>
+                  </div>
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                  <p>{selected.user.email}</p>
+                  <p>{selected.user.phone}</p>
+                  <p>Account {selected.user.status}</p>
+                </div>
+                <Link className="mt-2 inline-block text-xs font-medium text-indigo-600" to={`/users/profile/${selected.user.id}`}>Open user profile</Link>
+              </Panel>
+
+              <Panel title="Conversation">
+                <ol className="space-y-2">
+                  {selected.messages.map((item, index) => (
+                    <li key={index} className={`rounded-md px-3 py-2 text-xs ${item.role === 'admin' ? 'bg-indigo-50 dark:bg-indigo-950/20' : 'bg-gray-50 dark:bg-gray-900/40'}`}>
+                      <p className="font-medium">{item.actor} · {item.role === 'admin' ? 'Admin' : 'User'}</p>
+                      <p className="mt-1 whitespace-pre-wrap">{item.text}</p>
+                      <p className="mt-1 text-[11px] text-gray-400">{formatWhen(item.at)}</p>
+                    </li>
+                  ))}
+                </ol>
+                {selected.status !== 'Closed' && (
+                  <div className="mt-3 space-y-2">
+                    <textarea className="input-field min-h-[72px]" placeholder="Reply to user (sample only)" value={reply} onChange={(e) => setReply(e.target.value)} />
+                    <button type="button" className="rounded-md bg-gray-900 px-3 py-1.5 text-xs text-white" onClick={() => sendReply(false)}>Send reply</button>
                   </div>
                 )}
-                <div>
-                  <span className="text-gray-600 dark:text-gray-400">Created:</span>
-                  <span className="ml-2 font-medium">{selectedTicket.createdTime}</span>
-                </div>
-                <div>
-                  <span className="text-gray-600 dark:text-gray-400">Category:</span>
-                  <span className="ml-2 font-medium">{selectedTicket.category}</span>
-                </div>
-              </div>
-            </div>
+              </Panel>
 
-            {/* Issue Description - Prominent Container */}
-            <div>
-              <h4 className="font-semibold mb-3 text-gray-900 dark:text-white">Issue Description</h4>
-              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg border-2 border-gray-200 dark:border-gray-700 min-h-[100px]">
-                <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap">
-                  {selectedTicket.description || 'No description provided'}
-                </p>
-              </div>
-            </div>
+              <Panel title="Internal notes">
+                {selected.notes.length === 0 ? <p className="text-xs text-gray-500">No internal notes.</p> : (
+                  <ul className="space-y-1 text-xs">
+                    {selected.notes.map((item, index) => (
+                      <li key={index}>{item.actor} · {formatWhen(item.at)} — {item.text}</li>
+                    ))}
+                  </ul>
+                )}
+                {selected.status !== 'Closed' && (
+                  <div className="mt-2 space-y-2">
+                    <textarea className="input-field min-h-[56px]" placeholder="Internal note (not visible to user)" value={note} onChange={(e) => setNote(e.target.value)} />
+                    <button type="button" className="rounded-md border px-3 py-1.5 text-xs" onClick={() => sendReply(true)}>Add note</button>
+                  </div>
+                )}
+              </Panel>
 
-            {/* Resolved Status Message */}
-            {(selectedTicket.status === 'resolved' || selectedTicket.status === 'closed') && (
-              <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg border border-green-200 dark:border-green-700 text-center">
-                <div className="flex items-center justify-center gap-2 text-green-700 dark:text-green-400 font-semibold">
-                  <CheckCircle className="w-5 h-5" />
-                  ✅ Ticket Resolved
+              <Panel title="Actions">
+                <div className="flex flex-wrap gap-2">
+                  {selected.status !== 'Closed' && (
+                    <>
+                      <button type="button" className="rounded-md border px-2.5 py-1.5 text-[11px]" onClick={() => applyStatus(selected.id, 'In Progress')}>In progress</button>
+                      <button type="button" className="rounded-md border px-2.5 py-1.5 text-[11px]" onClick={() => applyStatus(selected.id, 'Waiting on User')}>Waiting on user</button>
+                      <button type="button" className="rounded-md border px-2.5 py-1.5 text-[11px]" onClick={() => { setNextStatus('Resolved'); setReason(''); setConfirm({ kind: 'status', id: selected.id }) }}>Resolve</button>
+                      <button type="button" className="rounded-md border px-2.5 py-1.5 text-[11px]" onClick={() => { setNextStatus('Closed'); setReason(''); setConfirm({ kind: 'status', id: selected.id }) }}>Close</button>
+                    </>
+                  )}
+                  <Link to={`/users/profile/${selected.user.id}`} className="rounded-md border px-2.5 py-1.5 text-[11px]">View profile</Link>
                 </div>
-              </div>
+                {selected.status === 'Closed' && <p className="mt-2 text-xs text-gray-500">Closed tickets are read-only in this sample.</p>}
+              </Panel>
+
+              <Panel title="Timeline">
+                <ol className="space-y-2">
+                  {selected.timeline.map((item, index) => (
+                    <li key={index} className="text-xs">
+                      <StatusBadge tone={statusTone(item.status)}>{item.status}</StatusBadge>
+                      <span className="ml-2 font-medium">{item.action}</span>
+                      <span className="block text-[11px] text-gray-400">{item.actor} · {formatWhen(item.at)}</span>
+                    </li>
+                  ))}
+                </ol>
+              </Panel>
+            </div>
+          </aside>
+        </div>
+      )}
+
+      <Modal isOpen={Boolean(confirm)} onClose={() => setConfirm(null)} title="Confirm sample action" size="sm">
+        {confirm?.kind === 'assign' && (
+          <select className="input-field mt-2" value={assignTo} onChange={(e) => setAssignTo(e.target.value)}>
+            {TICKET_ADMINS.filter((item) => item !== 'Unassigned').map((item) => <option key={item}>{item}</option>)}
+          </select>
+        )}
+        {confirm?.kind === 'status' && (
+          <div className="space-y-2">
+            <select className="input-field" value={nextStatus} onChange={(e) => setNextStatus(e.target.value)}>
+              {TICKET_STATUSES.map((item) => <option key={item}>{item}</option>)}
+            </select>
+            {(nextStatus === 'Resolved' || nextStatus === 'Closed') && (
+              <textarea className="input-field min-h-[72px]" placeholder="Resolution note required" value={reason} onChange={(e) => setReason(e.target.value)} />
             )}
-
-            {/* Bottom Actions - Clean Row */}
-            <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <button 
-                onClick={() => setShowTicketModal(false)} 
-                className="flex-1 px-4 py-2.5 border-2 border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors font-semibold"
-                disabled={processing}
-              >
-                Cancel
-              </button>
-              {selectedTicket.status !== 'resolved' && selectedTicket.status !== 'closed' ? (
-                <button 
-                  onClick={() => handleUpdateStatus(selectedTicket.id, 'resolved')}
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-lg font-semibold transition-colors shadow-md hover:shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
-                  disabled={processing}
-                >
-                  <CheckCircle className="w-5 h-5" />
-                  Resolved
-                </button>
-              ) : (
-                <button 
-                  onClick={() => handleDeleteTicket(selectedTicket.id)} 
-                  className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-lg font-semibold transition-colors shadow-md hover:shadow-lg disabled:opacity-50"
-                  disabled={processing}
-                >
-                  🗑️ Delete
-                </button>
-              )}
-            </div>
           </div>
         )}
-      </Modal>
-
-      {/* Delete Confirmation Modal */}
-      <Modal
-        isOpen={showDeleteConfirm}
-        onClose={() => {
-          setShowDeleteConfirm(false)
-          setTicketToDelete(null)
-        }}
-        title="Confirm Delete"
-      >
-        <div className="space-y-4">
-          <p className="text-gray-600 dark:text-gray-400">
-            Are you sure you want to delete this ticket? This action cannot be undone.
-          </p>
-          <div className="flex gap-3 pt-4">
-            <button
-              onClick={() => {
-                setShowDeleteConfirm(false)
-                setTicketToDelete(null)
-              }}
-              className="flex-1 px-4 py-2.5 border-2 border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors font-semibold"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={confirmDeleteTicket}
-              className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-lg font-semibold transition-colors disabled:opacity-50"
-              disabled={processing}
-            >
-              {processing ? 'Deleting...' : 'Delete Ticket'}
-            </button>
-          </div>
+        <p className="mt-2 text-xs text-gray-500">This updates the sample queue only.</p>
+        <div className="mt-4 flex justify-end gap-2">
+          <button type="button" className="rounded-md border px-3 py-1.5 text-xs" onClick={() => setConfirm(null)}>Cancel</button>
+          <button type="button" className="rounded-md bg-gray-900 px-3 py-1.5 text-xs text-white" onClick={runConfirm}>Confirm</button>
         </div>
       </Modal>
     </div>
@@ -687,4 +435,3 @@ const TicketsV2 = () => {
 }
 
 export default TicketsV2
-

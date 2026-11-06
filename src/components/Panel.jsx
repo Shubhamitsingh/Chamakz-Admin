@@ -6,7 +6,7 @@ const Panel = ({ title, action, children, padded = true, className = '' }) => (
         {action}
       </div>
     )}
-    <div className={padded ? 'p-4' : ''}>{children}</div>
+    <div className={`${padded ? 'p-4' : ''} flex-1 min-h-0`}>{children}</div>
   </section>
 )
 

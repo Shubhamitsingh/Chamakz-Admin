@@ -1,685 +1,308 @@
-import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
-import { MessageSquare, Eye, Trash2, Archive, CheckCircle, Clock, Filter, MessageCircle } from 'lucide-react'
-import { useApp } from '../context/AppContext'
-import SearchBar from '../components/SearchBar'
-import Table from '../components/Table'
-import Modal from '../components/Modal'
-import Loader from '../components/Loader'
+import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { AnimatePresence, motion } from 'framer-motion'
+import { RotateCcw, X } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
-import Panel from '../components/Panel'
-import KpiCard from '../components/KpiCard'
-import { collection, getDocs, getDoc, doc, updateDoc, deleteDoc, query, collectionGroup, serverTimestamp } from 'firebase/firestore'
-import { db } from '../firebase/config'
+import SearchBar from '../components/SearchBar'
+import Pagination from '../components/Pagination'
 import EmptyState from '../components/EmptyState'
+import StatusBadge from '../components/StatusBadge'
+import ExportButton from '../components/ExportButton'
+import { useApp } from '../context/AppContext'
+import {
+  FB_STATUSES,
+  SENTIMENT_THEME,
+  addFeedbackNote,
+  buildInsights,
+  emojiForRating,
+  formatWhen,
+  getFeedback,
+  listFeedback,
+  mutateFeedback,
+  ratingTone,
+  sentimentOf,
+  statusTone,
+} from '../utils/feedbackData'
+
+const Stars = ({ value }) => (
+  <span className="tracking-tight" aria-label={`${value} of 5`}>
+    {'★'.repeat(value)}{'☆'.repeat(5 - value)}
+  </span>
+)
+
+const Avatar = ({ name, tone }) => (
+  <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white ${tone || 'bg-slate-600'}`}>
+    {(name || '?').charAt(0)}
+  </span>
+)
 
 const Feedback = () => {
   const { showToast, markFeedbackAsSeen } = useApp()
-  const [activeTab, setActiveTab] = useState('new') // 'new' or 'read'
-  const [searchTerm, setSearchTerm] = useState('')
-  const [selectedFeedback, setSelectedFeedback] = useState(null)
-  const [showFeedbackModal, setShowFeedbackModal] = useState(false)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [feedbackToDelete, setFeedbackToDelete] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [processing, setProcessing] = useState(false)
-  const [feedback, setFeedback] = useState([])
-  const [foundIn, setFoundIn] = useState('')
+  const [tick, setTick] = useState(0)
+  const [search, setSearch] = useState('')
+  const [status, setStatus] = useState('all')
+  const [sentiment, setSentiment] = useState('all')
+  const [starFilter, setStarFilter] = useState('all')
+  const [sortKey, setSortKey] = useState('submittedAt')
+  const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(10)
+  const [selectedId, setSelectedId] = useState(null)
+  const [note, setNote] = useState('')
 
-  useEffect(() => {
-    const fetchFeedback = async () => {
-      console.log('🔍 Searching for feedback in Firebase...')
-      setLoading(true)
-      
-      try {
-        // Method 1: Try root collections
-        const rootCollections = [
-          'feedback',
-          'userFeedback',
-          'feedbacks',
-          'user_feedback',
-          'appFeedback',
-          'app_feedback',
-          'reviews',
-          'userReviews',
-          'suggestions',
-          'complaints'
-        ]
-        
-        for (const collName of rootCollections) {
-          try {
-            const snapshot = await getDocs(collection(db, collName))
-            if (snapshot.size > 0) {
-              console.log(`✅ Found ${snapshot.size} feedback entries in root collection: ${collName}`)
-              setFoundIn(`Root collection: ${collName}`)
-              const feedbackData = await processFeedback(snapshot)
-              setFeedback(feedbackData)
-              setLoading(false)
-              // Mark feedback as seen when page loads
-              if (markFeedbackAsSeen) {
-                markFeedbackAsSeen()
-              }
-              return
-            }
-          } catch (error) {
-            // Continue to next collection
-          }
-        }
+  useEffect(() => { markFeedbackAsSeen?.() }, [markFeedbackAsSeen])
 
-        // Method 2: Try collection groups (subcollections across all users)
-        console.log('🔍 Trying collection groups (subcollections)...')
-        const subCollectionNames = [
-          'feedback',
-          'userFeedback',
-          'feedbacks',
-          'reviews',
-          'suggestions'
-        ]
-        
-        for (const collName of subCollectionNames) {
-          try {
-            const q = query(collectionGroup(db, collName))
-            const snapshot = await getDocs(q)
-            if (snapshot.size > 0) {
-              console.log(`✅ Found ${snapshot.size} feedback entries in subcollection: ${collName}`)
-              setFoundIn(`Subcollection: ${collName} (under users)`)
-              const feedbackData = await processFeedback(snapshot)
-              setFeedback(feedbackData)
-              setLoading(false)
-              // Mark feedback as seen when page loads
-              if (markFeedbackAsSeen) {
-                markFeedbackAsSeen()
-              }
-              return
-            }
-          } catch (error) {
-            console.log(`Could not access collection group: ${collName}`)
-          }
-        }
+  const rows = useMemo(() => listFeedback(), [tick])
+  const selected = selectedId ? getFeedback(selectedId) : null
+  const refresh = () => setTick((value) => value + 1)
 
-        // Method 3: Check under specific user paths
-        console.log('🔍 Checking user subcollections...')
-        try {
-          const usersSnapshot = await getDocs(collection(db, 'users'))
-          let allFeedback = []
-          
-          for (const userDoc of usersSnapshot.docs.slice(0, 5)) { // Check first 5 users
-            for (const subColl of ['feedback', 'userFeedback', 'feedbacks']) {
-              try {
-                const feedbackRef = collection(db, 'users', userDoc.id, subColl)
-                const feedbackSnapshot = await getDocs(feedbackRef)
-                if (feedbackSnapshot.size > 0) {
-                  console.log(`✅ Found feedback under users/${userDoc.id}/${subColl}`)
-                  setFoundIn(`users/{userId}/${subColl}`)
-                  allFeedback = [...allFeedback, ...feedbackSnapshot.docs]
-                }
-              } catch (error) {
-                // Continue
-              }
-            }
-          }
-          
-          if (allFeedback.length > 0) {
-            const feedbackData = await processFeedback({ docs: allFeedback })
-            setFeedback(feedbackData)
-            setLoading(false)
-            // Mark feedback as seen when page loads
-            if (markFeedbackAsSeen) {
-              markFeedbackAsSeen()
-            }
-            return
-          }
-        } catch (error) {
-          console.error('Error checking user subcollections:', error)
-        }
-
-        console.log('⚠️ No feedback found anywhere')
-        setFeedback([])
-        setLoading(false)
-        // Mark feedback as seen when page loads (even if no feedback found)
-        if (markFeedbackAsSeen) {
-          markFeedbackAsSeen()
-        }
-        
-      } catch (error) {
-        console.error('Error fetching feedback:', error)
-        showToast('Error loading feedback', 'error')
-        setLoading(false)
-      }
-    }
-
-    fetchFeedback()
-  }, [])
-
-  const processFeedback = async (snapshot) => {
-    const feedbackPromises = snapshot.docs.map(async (feedbackDoc) => {
-      const data = feedbackDoc.data()
-      console.log('Processing feedback:', feedbackDoc.id, data)
-      
-      const userId = data.userId || data.uid || data.user_id || ''
-      let numericUserId = data.numericUserId || data.numeric_user_id || data.userNumericId || 'N/A'
-      
-      // If feedback has userId but no numericUserId, fetch it from users collection
-      if (userId && numericUserId === 'N/A') {
-        try {
-          const userRef = doc(db, 'users', userId)
-          const userSnap = await getDoc(userRef)
-          if (userSnap.exists()) {
-            const userData = userSnap.data()
-            numericUserId = userData.numericUserId || 'N/A'
-          }
-        } catch (error) {
-          console.log('Could not fetch user data:', error)
-        }
-      }
-      
-      return {
-        id: feedbackDoc.id,
-        path: feedbackDoc.ref.path,
-        feedbackId: feedbackDoc.id.substring(0, 8).toUpperCase(),
-        username: data.userName || data.username || data.name || data.userDisplayName || data.fullName || data.user || 'Unknown User',
-        email: data.userEmail || data.email || data.emailAddress || data.contactEmail || 'N/A',
-        userId: userId,
-        numericUserId: numericUserId,
-        subject: data.subject || data.title || data.feedbackTitle || 'No Subject',
-        message: data.message || data.feedback || data.description || data.content || data.body || data.text || data.comment || 'No message',
-        rating: data.rating || data.starRating || null,
-        category: data.category || data.type || data.feedbackType || 'General',
-        status: (data.status || data.feedbackStatus || 'new').toLowerCase(),
-        created: formatDate(data.createdAt || data.createdDate || data.timestamp || data.created_at),
-        createdTime: formatDateTime(data.createdAt || data.createdDate || data.timestamp || data.created_at),
-        ...data
-      }
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return rows.filter((row) => {
+      if (status !== 'all' && row.status !== status) return false
+      if (sentiment !== 'all' && sentimentOf(row.rating) !== sentiment) return false
+      if (starFilter !== 'all' && row.rating !== Number(starFilter)) return false
+      if (!q) return true
+      return `${row.id} ${row.user.name} ${row.user.numericId} ${row.subject} ${row.message}`.toLowerCase().includes(q)
+    }).sort((a, b) => {
+      if (sortKey === 'rating') return b.rating - a.rating
+      return new Date(b.submittedAt) - new Date(a.submittedAt)
     })
-    
-    const feedbackData = await Promise.all(feedbackPromises)
-    
-    return feedbackData.sort((a, b) => {
-      const dateA = a.createdAt || a.createdDate || a.timestamp || a.created_at
-      const dateB = b.createdAt || b.createdDate || b.timestamp || b.created_at
-      if (!dateA) return 1
-      if (!dateB) return -1
-      return dateB.toDate() - dateA.toDate()
-    })
+  }, [rows, status, sentiment, starFilter, search, sortKey])
+
+  const insights = useMemo(() => buildInsights(filtered), [filtered])
+  const theme = insights.mood.theme
+
+  useEffect(() => { setPage(1) }, [search, status, sentiment, starFilter])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
+  const pageRows = filtered.slice((page - 1) * perPage, page * perPage)
+  const filtersOn = status !== 'all' || sentiment !== 'all' || starFilter !== 'all' || search
+
+  const reset = () => {
+    setSearch('')
+    setStatus('all')
+    setSentiment('all')
+    setStarFilter('all')
+    setSortKey('submittedAt')
   }
 
-  const formatDate = (timestamp) => {
-    if (!timestamp) return 'N/A'
-    try {
-      return new Date(timestamp.toDate()).toLocaleDateString()
-    } catch {
-      return 'N/A'
-    }
+  const setStatusOn = (id, next) => {
+    mutateFeedback(id, { status: next }, { actor: 'Admin User', action: `Status → ${next}`, status: next })
+    refresh()
+    showToast(`Sample feedback marked ${next}`, 'success')
   }
 
-  const formatDateTime = (timestamp) => {
-    if (!timestamp) return 'N/A'
-    try {
-      return new Date(timestamp.toDate()).toLocaleString()
-    } catch {
-      return 'N/A'
-    }
-  }
-
-  const getStatusColor = (status) => {
-    const statusLower = status.toLowerCase()
-    switch (statusLower) {
-      case 'new':
-      case 'unread':
-        return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-      case 'read':
-      case 'viewed':
-        return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-      case 'archived':
-        return 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400'
-      default:
-        return 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400'
-    }
-  }
-
-  const handleUpdateStatus = async (feedbackId, newStatus) => {
-    setProcessing(true)
-    try {
-      // Try to find the collection name from the feedback path
-      const feedbackItem = feedback.find(f => f.id === feedbackId)
-      if (!feedbackItem) {
-        throw new Error('Feedback not found')
-      }
-
-      // Extract collection name from path (format: collectionName/docId or users/userId/collectionName/docId)
-      const pathParts = feedbackItem.path.split('/')
-      const isSubcollection = pathParts.length > 2
-      
-      let feedbackRef
-      if (isSubcollection) {
-        // Subcollection: users/userId/feedback/docId
-        feedbackRef = doc(db, feedbackItem.path)
-      } else {
-        // Root collection: feedback/docId
-        const collectionName = pathParts[0]
-        feedbackRef = doc(db, collectionName, feedbackId)
-      }
-
-      await updateDoc(feedbackRef, {
-        status: newStatus,
-        updatedAt: serverTimestamp(),
-        ...(newStatus === 'read' && { readAt: serverTimestamp() }),
-        ...(newStatus === 'archived' && { archivedAt: serverTimestamp() })
-      })
-      
-      // Update local state
-      setFeedback(prev => prev.map(f => 
-        f.id === feedbackId ? { ...f, status: newStatus } : f
-      ))
-      
-      console.log('✅ Feedback status updated to:', newStatus)
-      showToast('Feedback status updated successfully')
-      
-      if (newStatus === 'read') {
-        setShowFeedbackModal(false)
-        setActiveTab('read')
-      }
-    } catch (error) {
-      console.error('Error updating feedback:', error)
-      showToast('Error updating feedback status', 'error')
-    }
-    setProcessing(false)
-  }
-
-  const handleDeleteFeedback = (feedbackId) => {
-    setFeedbackToDelete(feedbackId)
-    setShowDeleteConfirm(true)
-  }
-
-  const confirmDeleteFeedback = async () => {
-    if (!feedbackToDelete) return
-
-    setProcessing(true)
-    setShowDeleteConfirm(false)
-    try {
-      const feedbackItem = feedback.find(f => f.id === feedbackToDelete)
-      if (!feedbackItem) {
-        throw new Error('Feedback not found')
-      }
-
-      const pathParts = feedbackItem.path.split('/')
-      const feedbackRef = doc(db, feedbackItem.path)
-
-      await deleteDoc(feedbackRef)
-      
-      // Update local state
-      setFeedback(prev => prev.filter(f => f.id !== feedbackToDelete))
-      setShowFeedbackModal(false)
-      showToast('Feedback deleted successfully', 'success')
-      setFeedbackToDelete(null)
-    } catch (error) {
-      showToast('Error deleting feedback', 'error')
-    }
-    setProcessing(false)
-  }
-
-  // Separate feedback based on status
-  const newFeedback = feedback.filter(f => {
-    const isNew = ['new', 'unread'].includes(f.status.toLowerCase())
-    return isNew
-  })
-
-  const readFeedback = feedback.filter(f => {
-    const isRead = ['read', 'viewed', 'archived'].includes(f.status.toLowerCase())
-    return isRead
-  })
-
-  // Filter based on active tab and search
-  const currentTabFeedback = activeTab === 'new' ? newFeedback : readFeedback
-  
-  const filteredFeedback = currentTabFeedback.filter(f => {
-    const matchesSearch = 
-      f.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      f.feedbackId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      f.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      f.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      f.email.toLowerCase().includes(searchTerm.toLowerCase())
-    
-    return matchesSearch
-  })
-
-  const statusCounts = {
-    all: feedback.length,
-    new: newFeedback.length,
-    read: readFeedback.length,
-  }
-
-  const columns = [
-    { 
-      header: 'Feedback ID', 
-      accessor: 'feedbackId',
-      render: (row) => (
-        <span className="font-mono font-semibold text-gray-900 dark:text-gray-100">
-          #{row.feedbackId}
-        </span>
-      )
-    },
-    {
-      header: 'User',
-      accessor: 'username',
-      render: (row) => (
-        <div>
-          <p className="font-medium">{row.username}</p>
-          <p className="text-xs text-gray-900 dark:text-gray-100 font-mono font-bold">
-            ID: {row.numericUserId}
-          </p>
-          {row.email !== 'N/A' && (
-            <p className="text-xs text-gray-500">{row.email}</p>
-          )}
-        </div>
-      ),
-    },
-    { 
-      header: 'Subject', 
-      accessor: 'subject',
-      render: (row) => (
-        <div className="max-w-xs">
-          <p className="truncate font-medium">{row.subject}</p>
-          <p className="text-xs text-gray-500 truncate">{row.message}</p>
-        </div>
-      )
-    },
-    {
-      header: 'Rating',
-      accessor: 'rating',
-      render: (row) => (
-        row.rating ? (
-          <div className="flex items-center gap-1">
-            <span className="text-yellow-500">★</span>
-            <span className="font-medium">{row.rating}/5</span>
-          </div>
-        ) : (
-          <span className="text-gray-400">-</span>
-        )
-      ),
-    },
-    {
-      header: 'Status',
-      accessor: 'status',
-      render: (row) => (
-        <span className={`px-2 py-0.5 rounded-md text-[11px] font-medium capitalize ${getStatusColor(row.status)}`}>
-          {row.status}
-        </span>
-      ),
-    },
-    { header: 'Created', accessor: 'created' },
-    {
-      header: 'Actions',
-      render: (row) => (
-        <div className="flex gap-2">
-          <button
-            onClick={() => {
-              setSelectedFeedback(row)
-              setShowFeedbackModal(true)
-              // Auto-mark as read when viewing
-              if (row.status === 'new' || row.status === 'unread') {
-                handleUpdateStatus(row.id, 'read')
-              }
-            }}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-            title="View Details"
-          >
-            <Eye className="w-4 h-4" />
-          </button>
-        </div>
-      ),
-    },
+  const exportRows = filtered.map((row) => ({
+    id: row.id,
+    user: `${row.user.name} (${row.user.numericId})`,
+    rating: row.rating,
+    emoji: emojiForRating(row.rating).emoji,
+    category: row.category,
+    type: row.type,
+    message: row.message,
+    submitted: formatWhen(row.submittedAt),
+  }))
+  const exportColumns = [
+    { header: 'Feedback ID', accessor: 'id' },
+    { header: 'User', accessor: 'user' },
+    { header: 'Rating', accessor: 'rating' },
+    { header: 'Emoji', accessor: 'emoji' },
+    { header: 'Category', accessor: 'category' },
+    { header: 'Type', accessor: 'type' },
+    { header: 'Feedback', accessor: 'message' },
+    { header: 'Submitted', accessor: 'submitted' },
   ]
 
-  if (loading) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <Loader />
-      </div>
-    )
-  }
-
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-4">
       <PageHeader
-        title="Feedback"
-        description={foundIn ? `User feedback and app reviews. Source: ${foundIn}` : 'User feedback, suggestions, and app reviews.'}
+        title="User satisfaction"
+        description="Sample in-app ratings. Counts and emoji follow the current filters. Nothing is emailed to users."
+        actions={
+          <div className="flex flex-wrap gap-2">
+            {filtersOn && (
+              <button type="button" className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs" onClick={reset}>
+                <RotateCcw className="h-3.5 w-3.5" /> Reset filters
+              </button>
+            )}
+            <ExportButton data={exportRows} columns={exportColumns} filename="feedback" disabled={exportRows.length === 0} />
+          </div>
+        }
       />
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-        <KpiCard title="Total feedback" value={statusCounts.all} icon={MessageSquare} />
-        <KpiCard title="New" value={statusCounts.new} icon={Clock} />
-        <KpiCard title="Read" value={statusCounts.read} icon={CheckCircle} />
+      <section className={`overflow-hidden rounded-2xl border ${theme.hero}`}>
+        <div className="flex flex-col lg:flex-row lg:items-stretch">
+          <div className="flex items-center gap-4 px-5 py-4 lg:w-[320px] lg:shrink-0 lg:border-r lg:border-black/5 dark:lg:border-white/10">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={insights.mood.emoji}
+                initial={{ scale: 0.86, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                transition={{ duration: 0.22 }}
+                className={`flex h-[4.5rem] w-[4.5rem] shrink-0 items-center justify-center rounded-2xl text-[2.75rem] leading-none ${theme.emojiWrap}`}
+                aria-label={insights.mood.label}
+              >
+                {insights.mood.emoji}
+              </motion.div>
+            </AnimatePresence>
+            <div className="min-w-0">
+              <p className={`text-[10px] font-semibold uppercase tracking-[0.14em] ${theme.kicker}`}>Satisfaction</p>
+              <p className="mt-0.5 text-[2rem] font-semibold tabular-nums leading-none tracking-tight">
+                {insights.avg.toFixed(1)}
+                <span className="ml-1 text-sm font-medium text-gray-400">/ 5</span>
+              </p>
+              <p className={`mt-1 text-sm font-medium ${theme.label}`}>{insights.mood.label}</p>
+            </div>
+          </div>
+          <div className="grid min-h-[5.5rem] flex-1 grid-cols-5">
+            {[
+              { label: 'Received', value: insights.total.toLocaleString('en-IN'), hint: 'sample voices', onClick: () => { setSentiment('all'); setStarFilter('all') }, valueClass: 'text-slate-900 dark:text-white' },
+              { label: 'Average', value: insights.avg.toFixed(1), hint: 'out of 5', valueClass: theme.label },
+              { label: 'Positive', value: insights.positive, hint: `${insights.positivePct}% · 4–5★`, onClick: () => setSentiment(sentiment === 'Positive' ? 'all' : 'Positive'), active: sentiment === 'Positive', valueClass: SENTIMENT_THEME.Positive.value, wash: 'bg-emerald-50/90 dark:bg-emerald-950/25' },
+              { label: 'Neutral', value: insights.neutral, hint: `${insights.neutralPct}% · 3★`, onClick: () => setSentiment(sentiment === 'Neutral' ? 'all' : 'Neutral'), active: sentiment === 'Neutral', valueClass: SENTIMENT_THEME.Neutral.value, wash: 'bg-amber-50/90 dark:bg-amber-950/25' },
+              { label: 'Negative', value: insights.negative, hint: `${insights.negativePct}% · 1–2★`, onClick: () => setSentiment(sentiment === 'Negative' ? 'all' : 'Negative'), active: sentiment === 'Negative', valueClass: SENTIMENT_THEME.Negative.value, wash: 'bg-rose-50/90 dark:bg-rose-950/25' },
+            ].map((item, index) => {
+              const Tag = item.onClick ? 'button' : 'div'
+              return (
+                <Tag
+                  key={item.label}
+                  type={item.onClick ? 'button' : undefined}
+                  onClick={item.onClick}
+                  className={`flex flex-col justify-center px-2 py-3 text-left sm:px-4 ${index > 0 ? 'border-l border-black/5 dark:border-white/10' : ''} ${item.wash || ''} ${item.active ? 'ring-inset ring-1 ring-slate-900/15' : ''}`}
+                >
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-gray-500">{item.label}</p>
+                  <p className={`mt-1 text-lg font-semibold tabular-nums leading-none sm:text-xl ${item.valueClass}`}>{item.value}</p>
+                  <p className="mt-1 hidden text-[11px] text-gray-400 sm:block">{item.hint}</p>
+                </Tag>
+              )
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+        <p className="mb-3 text-[11px] font-medium uppercase tracking-wide text-gray-500">Rating mix · tap a bar to filter</p>
+        <ul className="space-y-2">
+          {insights.stars.map((item) => (
+            <li key={item.star}>
+              <button type="button" className="flex w-full items-center gap-2 text-left text-xs" onClick={() => setStarFilter(starFilter === item.star ? 'all' : item.star)}>
+                <span className="w-8 text-lg leading-none">{item.emoji}</span>
+                <span className="w-16 text-gray-500">{item.star}★</span>
+                <div className={`h-2 flex-1 overflow-hidden rounded-full ${item.track}`}>
+                  <div className={`h-full rounded-full ${item.bar} ${starFilter === item.star ? 'opacity-100' : 'opacity-85'}`} style={{ width: `${Math.max(item.pct, item.count ? 4 : 0)}%` }} />
+                </div>
+                <span className="w-16 text-right tabular-nums text-gray-600">{item.count} · {item.pct}%</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <SearchBar placeholder="Search name, ID, or message" value={search} onChange={setSearch} />
+        {['all', ...FB_STATUSES].map((item) => (
+          <button key={item} type="button" className={`rounded-full px-3 py-1 text-xs ${status === item ? theme.chip : 'bg-white ring-1 ring-slate-200 dark:bg-gray-800'}`} onClick={() => setStatus(item)}>{item === 'all' ? 'All statuses' : item}</button>
+        ))}
+        <select className="input-field max-w-[150px]" value={sortKey} onChange={(e) => setSortKey(e.target.value)}>
+          <option value="submittedAt">Newest</option>
+          <option value="rating">Highest rating</option>
+        </select>
       </div>
 
-      {/* Tabs */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="card"
-      >
-        <div className="flex gap-4 border-b border-gray-200 dark:border-gray-700">
-          <button
-            onClick={() => setActiveTab('new')}
-            className={`flex items-center gap-2 px-4 py-3 font-medium transition-colors relative ${
-              activeTab === 'new'
-                ? 'text-gray-900 dark:text-gray-100'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-            }`}
-          >
-            <Clock className="w-5 h-5" />
-            New Feedback
-            <span className="ml-1 px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded-full text-xs font-bold">
-              {statusCounts.new}
-            </span>
-            {activeTab === 'new' && (
-              <motion.div
-                layoutId="feedbackTab"
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-900 dark:bg-white"
-              />
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab('read')}
-            className={`flex items-center gap-2 px-4 py-3 font-medium transition-colors relative ${
-              activeTab === 'read'
-                ? 'text-gray-900 dark:text-gray-100'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-            }`}
-          >
-            <CheckCircle className="w-5 h-5" />
-            Read Feedback
-            <span className="ml-1 px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-xs font-bold">
-              {statusCounts.read}
-            </span>
-            {activeTab === 'read' && (
-              <motion.div
-                layoutId="feedbackTab"
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-900 dark:bg-white"
-              />
-            )}
-          </button>
+      {pageRows.length === 0 ? (
+        <EmptyState title="No voices match these filters" description="Reset filters to see the full sample inbox." />
+      ) : (
+        <div className="grid gap-3 md:grid-cols-2">
+          {pageRows.map((row) => {
+            const mood = emojiForRating(row.rating)
+            const tone = ratingTone(row.rating)
+            return (
+              <article key={row.id} className={`rounded-xl border bg-white p-4 dark:bg-gray-800 ${tone.border}`}>
+                <div className="flex gap-3">
+                  <Avatar name={row.user.name} tone={tone.avatar} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-medium">{row.user.name}</p>
+                        <p className="font-mono text-[11px] text-gray-400">{row.user.numericId}</p>
+                      </div>
+                      <span className="text-2xl leading-none" title={mood.label}>{mood.emoji}</span>
+                    </div>
+                    <p className={`mt-1 text-xs ${tone.stars}`}><Stars value={row.rating} /> · {mood.label}</p>
+                    <p className="mt-1 text-[11px] text-gray-500">{row.category} · {row.type}</p>
+                  </div>
+                </div>
+                <h2 className="mt-3 text-sm font-semibold">{row.subject}</h2>
+                <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">“{row.message}”</p>
+                <p className="mt-2 text-[11px] text-gray-400">{formatWhen(row.submittedAt)} · {row.platform}</p>
+                <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                  <StatusBadge tone={statusTone(row.status)}>{row.status}</StatusBadge>
+                  <button type="button" className={`rounded-full px-3 py-1 text-[11px] text-white ${tone.header}`} onClick={() => setSelectedId(row.id)}>Open</button>
+                </div>
+              </article>
+            )
+          })}
         </div>
+      )}
 
-        {/* Search Bar */}
-        <div className="pt-4">
-          <SearchBar
-            placeholder="Search by feedback ID, user, subject, or message..."
-            value={searchTerm}
-            onChange={setSearchTerm}
-          />
-        </div>
-      </motion.div>
+      <Pagination currentPage={page} totalPages={totalPages} totalItems={filtered.length} itemsPerPage={perPage} onPageChange={setPage} onItemsPerPageChange={(value) => { setPerPage(value); setPage(1) }} />
 
-      {/* Feedback Table */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="card">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold">
-            {activeTab === 'new' ? 'New Feedback' : 'Read Feedback'} ({filteredFeedback.length})
-          </h2>
-        </div>
-        {filteredFeedback.length === 0 ? (
-          <EmptyState
-            icon={activeTab === 'new' ? Clock : CheckCircle}
-            title={activeTab === 'new' 
-              ? 'No new feedback' 
-              : 'No read feedback'}
-            description={activeTab === 'new' 
-              ? 'Great job! All feedback has been reviewed. New feedback from users will appear here.'
-              : 'Read feedback will appear here once you mark feedback as read.'}
-          />
-        ) : (
-          <Table columns={columns} data={filteredFeedback} />
-        )}
-      </motion.div>
-
-      {/* Feedback Detail Modal */}
-      <Modal
-        isOpen={showFeedbackModal}
-        onClose={() => setShowFeedbackModal(false)}
-        title="Feedback Details"
-      >
-        {selectedFeedback && (
-          <div className="space-y-6">
-            <div className="flex items-start justify-between">
+      {selected && (
+        <div className="fixed inset-0 z-40 flex justify-end">
+          <button type="button" className="absolute inset-0 bg-black/30" aria-label="Close" onClick={() => setSelectedId(null)} />
+          <aside className="relative z-50 flex h-full w-full max-w-lg flex-col overflow-y-auto border-l border-slate-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+            <div className={`flex items-start justify-between px-4 py-4 text-white ${ratingTone(selected.rating).header}`}>
               <div>
-                <h3 className="text-sm font-semibold mb-1">{selectedFeedback.subject}</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Feedback #{selectedFeedback.feedbackId}</p>
-                <p className="text-xs text-gray-500 mt-1 font-mono">{selectedFeedback.path}</p>
+                <p className="font-mono text-[11px] text-white/80">{selected.id}</p>
+                <p className="text-3xl leading-none">{emojiForRating(selected.rating).emoji}</p>
+                <h2 className="mt-1 text-base font-semibold">{selected.subject}</h2>
+                <p className="text-xs text-white/80">{selected.rating}/5 · {emojiForRating(selected.rating).label}</p>
               </div>
-              <div className="flex gap-2">
-                <span className={`px-2 py-0.5 rounded-md text-[11px] font-medium capitalize ${getStatusColor(selectedFeedback.status)}`}>
-                  {selectedFeedback.status}
-                </span>
-                {selectedFeedback.rating && (
-                  <div className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
-                    <span>★</span>
-                    <span>{selectedFeedback.rating}/5</span>
-                  </div>
-                )}
-              </div>
+              <button type="button" className="rounded-md p-1 hover:bg-white/10" onClick={() => setSelectedId(null)}><X className="h-4 w-4" /></button>
             </div>
-
-            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-              <h4 className="font-semibold mb-2">User Information</h4>
-              <div className="grid grid-cols-2 gap-2 text-sm">
+            <div className="space-y-4 p-4">
+              <p className={`rounded-xl p-4 text-sm leading-relaxed ${ratingTone(selected.rating).quote}`}>“{selected.message}”</p>
+              <div className="flex items-center gap-3">
+                <Avatar name={selected.user.name} tone={ratingTone(selected.rating).avatar} />
                 <div>
-                  <span className="text-gray-600 dark:text-gray-400">Name:</span>
-                  <span className="ml-2 font-medium">{selectedFeedback.username}</span>
-                </div>
-                <div>
-                  <span className="text-gray-600 dark:text-gray-400">User ID:</span>
-                  <span className="ml-2 font-bold text-gray-900 dark:text-gray-100 font-mono">
-                    {selectedFeedback.numericUserId}
-                  </span>
-                </div>
-                {selectedFeedback.email !== 'N/A' && (
-                  <div>
-                    <span className="text-gray-600 dark:text-gray-400">Email:</span>
-                    <span className="ml-2 font-medium">{selectedFeedback.email}</span>
-                  </div>
-                )}
-                <div>
-                  <span className="text-gray-600 dark:text-gray-400">Created:</span>
-                  <span className="ml-2 font-medium">{selectedFeedback.createdTime}</span>
-                </div>
-                <div>
-                  <span className="text-gray-600 dark:text-gray-400">Category:</span>
-                  <span className="ml-2 font-medium">{selectedFeedback.category}</span>
+                  <p className="font-medium">{selected.user.name}</p>
+                  <p className="font-mono text-[11px] text-gray-500">{selected.user.numericId}</p>
+                  <p className="text-xs">{selected.user.email}</p>
                 </div>
               </div>
-            </div>
-
-            {/* Feedback Message - Prominent Container */}
-            <div>
-              <h4 className="font-semibold mb-3 text-gray-900 dark:text-white">Feedback Message</h4>
-              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg border-2 border-gray-200 dark:border-gray-700 min-h-[100px]">
-                <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap">
-                  {selectedFeedback.message || 'No message provided'}
-                </p>
-              </div>
-            </div>
-
-            {/* Read Status Message */}
-            {selectedFeedback.status === 'read' && (
-              <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg border border-green-200 dark:border-green-700 text-center">
-                <div className="flex items-center justify-center gap-2 text-green-700 dark:text-green-400 font-semibold">
-                  <CheckCircle className="w-5 h-5" />
-                  ✅ Feedback Read
-                </div>
-              </div>
-            )}
-
-            {/* Bottom Actions */}
-            <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <button 
-                onClick={() => setShowFeedbackModal(false)} 
-                className="flex-1 px-4 py-2.5 border-2 border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors font-semibold"
-                disabled={processing}
+              <p className="text-xs text-gray-500">{selected.category} · {selected.type} · {selected.platform} {selected.appVersion} · {formatWhen(selected.submittedAt)}</p>
+              <Link className={`inline-block text-xs font-medium ${theme.link}`} to={`/users/profile/${selected.user.id}`}>Open user profile</Link>
+              <textarea className="input-field min-h-[64px]" placeholder="Private admin note — not sent to the user" value={note} onChange={(e) => setNote(e.target.value)} />
+              <button
+                type="button"
+                className={`rounded-full px-3 py-1.5 text-xs text-white ${theme.btn}`}
+                onClick={() => {
+                  if (!note.trim()) {
+                    showToast('Write a note first', 'error')
+                    return
+                  }
+                  addFeedbackNote(selected.id, note.trim())
+                  setNote('')
+                  refresh()
+                  showToast('Note saved on this sample', 'success')
+                }}
               >
-                Close
+                Save note
               </button>
-              {selectedFeedback.status === 'new' || selectedFeedback.status === 'unread' ? (
-                <button 
-                  onClick={() => handleUpdateStatus(selectedFeedback.id, 'read')}
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-lg font-semibold transition-colors shadow-md hover:shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
-                  disabled={processing}
-                >
-                  <CheckCircle className="w-5 h-5" />
-                  Mark as Read
-                </button>
-              ) : (
-                <button 
-                  onClick={() => handleDeleteFeedback(selectedFeedback.id)} 
-                  className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-lg font-semibold transition-colors shadow-md hover:shadow-lg disabled:opacity-50"
-                  disabled={processing}
-                >
-                  🗑️ Delete
-                </button>
+              {selected.status !== 'Archived' && (
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" className="rounded-full border px-3 py-1.5 text-[11px]" onClick={() => setStatusOn(selected.id, 'Reviewed')}>Heard</button>
+                  <button type="button" className="rounded-full border px-3 py-1.5 text-[11px]" onClick={() => setStatusOn(selected.id, 'Actioned')}>Actioned</button>
+                  <button type="button" className="rounded-full border px-3 py-1.5 text-[11px]" onClick={() => setStatusOn(selected.id, 'Archived')}>Archive</button>
+                </div>
               )}
             </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* Delete Confirmation Modal */}
-      <Modal
-        isOpen={showDeleteConfirm}
-        onClose={() => {
-          setShowDeleteConfirm(false)
-          setFeedbackToDelete(null)
-        }}
-        title="Confirm Delete"
-      >
-        <div className="space-y-4">
-          <p className="text-gray-600 dark:text-gray-400">
-            Are you sure you want to delete this feedback? This action cannot be undone.
-          </p>
-          <div className="flex gap-3 pt-4">
-            <button
-              onClick={() => {
-                setShowDeleteConfirm(false)
-                setFeedbackToDelete(null)
-              }}
-              className="flex-1 px-4 py-2.5 border-2 border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors font-semibold"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={confirmDeleteFeedback}
-              className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-lg font-semibold transition-colors disabled:opacity-50"
-              disabled={processing}
-            >
-              {processing ? 'Deleting...' : 'Confirm Delete'}
-            </button>
-          </div>
+          </aside>
         </div>
-      </Modal>
+      )}
     </div>
   )
 }
 
 export default Feedback
-
-

@@ -20,6 +20,7 @@ import EconomyPanel from '../components/dashboard/EconomyPanel'
 import SafetyFeed from '../components/dashboard/SafetyFeed'
 import HostsAnalytics from '../components/dashboard/HostsAnalytics'
 import SystemStrip from '../components/dashboard/SystemStrip'
+import GeoSnapshot from '../components/dashboard/GeoSnapshot'
 import { exportToCSV } from '../utils/exportUtils'
 import { formatCompact, timeAgo } from '../utils/dashboardFields'
 
@@ -213,6 +214,7 @@ const Dashboard = () => {
       </div>
 
       <SafetyFeed metrics={metrics} />
+      <GeoSnapshot preset={['today', '7d', '30d', '90d', 'custom'].includes(preset) ? preset : '30d'} />
       <HostsAnalytics
         metrics={metrics}
         availability={availability}

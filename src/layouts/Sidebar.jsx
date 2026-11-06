@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
-import { NavLink } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { NavLink, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   LayoutDashboard,
@@ -10,6 +10,7 @@ import {
   DollarSign,
   Settings,
   LogOut,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   MessageCircle,
@@ -18,8 +19,11 @@ import {
   UserCheck,
   Gift,
   AlertTriangle,
+  MapPin,
+  Gem,
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
+import { USER_ANALYTICS_PATH, USER_SEGMENTS } from '../utils/userManagementData'
 
 const Sidebar = () => {
   const { 
@@ -33,6 +37,13 @@ const Sidebar = () => {
     pendingTransactionsCount,
     newFeedbackCount
   } = useApp()
+  const location = useLocation()
+  const usersOpenDefault = location.pathname.startsWith('/users')
+  const [usersOpen, setUsersOpen] = useState(usersOpenDefault)
+
+  useEffect(() => {
+    if (location.pathname.startsWith('/users')) setUsersOpen(true)
+  }, [location.pathname])
   
   // Debug: Log badge count
   useEffect(() => {
@@ -41,11 +52,19 @@ const Sidebar = () => {
 
   const menuItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { path: '/users', icon: Users, label: 'Users', badge: newUsersCount },
+    { path: '/geo-analytics', icon: MapPin, label: 'Geography' },
+    {
+      path: '/users',
+      icon: Users,
+      label: 'Users',
+      badge: newUsersCount,
+      children: [...USER_SEGMENTS, { id: 'analytics', path: USER_ANALYTICS_PATH, label: 'User Analytics' }],
+    },
     { path: '/host-applications', icon: UserCheck, label: 'Host Applications', badge: pendingHostApplicationsCount },
     { path: '/chats', icon: MessageSquare, label: 'Chats', badge: unreadChatsCount },
     { path: '/tickets', icon: Ticket, label: 'Tickets / Support', badge: openTicketsCount },
     { path: '/transactions', icon: DollarSign, label: 'Transactions', badge: pendingTransactionsCount },
+    { path: '/diamond-sellers', icon: Gem, label: 'Diamond Sellers' },
     { path: '/chamakz-team', icon: UsersRound, label: 'Chamakz Team' },
     { path: '/banners', icon: BannerIcon, label: 'Banners' },
     { path: '/gifts', icon: Gift, label: 'Gifts' },
@@ -97,36 +116,98 @@ const Sidebar = () => {
 
           {/* Menu Items */}
           <nav className="flex-1 overflow-y-auto py-4">
-            {menuItems.map((item, index) => (
-              <NavLink
-                key={index}
-                to={item.path}
-                className={({ isActive }) =>
-                  `flex items-center gap-2.5 px-3 py-2 mx-2 rounded-lg transition-all mb-0.5 relative ${
-                    isActive
-                      ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
-                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/60'
-                  }`
-                }
-              >
-                <item.icon className="w-5 h-5 flex-shrink-0" />
-                {sidebarOpen && <span className="text-sm font-medium truncate">{item.label}</span>}
-                {/* Badge - Show when count > 0 */}
-                {item.badge !== undefined && item.badge !== null && Number(item.badge) > 0 && (
-                  <>
-                    {sidebarOpen ? (
-                      <span className="ml-auto bg-red-600 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-md min-w-[18px] text-center z-10">
-                        {Number(item.badge) > 99 ? '99+' : Number(item.badge)}
-                      </span>
-                    ) : (
-                      <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-semibold w-4 h-4 rounded-md flex items-center justify-center z-10">
-                        {Number(item.badge) > 99 ? '99+' : Number(item.badge)}
-                      </span>
-                    )}
-                  </>
-                )}
-              </NavLink>
-            ))}
+            {menuItems.map((item, index) => {
+              const parentActive = item.children
+                ? location.pathname.startsWith(item.path)
+                : location.pathname === item.path
+              return (
+                <div key={index}>
+                  {item.children ? (
+                    <div className={`flex items-center mx-2 mb-0.5 rounded-lg ${parentActive && !sidebarOpen ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : ''}`}>
+                      <NavLink
+                        to={item.path}
+                        className={`flex flex-1 items-center gap-2.5 px-3 py-2 rounded-lg transition-all relative ${
+                          parentActive && !item.children
+                            ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                            : parentActive
+                              ? 'text-gray-900 dark:text-white'
+                              : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/60'
+                        }`}
+                      >
+                        <item.icon className="w-5 h-5 flex-shrink-0" />
+                        {sidebarOpen && <span className="text-sm font-medium truncate">{item.label}</span>}
+                        {item.badge !== undefined && item.badge !== null && Number(item.badge) > 0 && (
+                          sidebarOpen ? (
+                            <span className="ml-auto bg-red-600 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-md min-w-[18px] text-center z-10">
+                              {Number(item.badge) > 99 ? '99+' : Number(item.badge)}
+                            </span>
+                          ) : (
+                            <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-semibold w-4 h-4 rounded-md flex items-center justify-center z-10">
+                              {Number(item.badge) > 99 ? '99+' : Number(item.badge)}
+                            </span>
+                          )
+                        )}
+                      </NavLink>
+                      {sidebarOpen && (
+                        <button
+                          type="button"
+                          className="px-2 py-2 text-gray-500"
+                          onClick={() => setUsersOpen((open) => !open)}
+                          aria-label="Toggle user menus"
+                        >
+                          <ChevronDown className={`h-4 w-4 transition ${usersOpen ? 'rotate-180' : ''}`} />
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <NavLink
+                      to={item.path}
+                      className={({ isActive }) =>
+                        `flex items-center gap-2.5 px-3 py-2 mx-2 rounded-lg transition-all mb-0.5 relative ${
+                          isActive
+                            ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/60'
+                        }`
+                      }
+                    >
+                      <item.icon className="w-5 h-5 flex-shrink-0" />
+                      {sidebarOpen && <span className="text-sm font-medium truncate">{item.label}</span>}
+                      {item.badge !== undefined && item.badge !== null && Number(item.badge) > 0 && (
+                        sidebarOpen ? (
+                          <span className="ml-auto bg-red-600 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-md min-w-[18px] text-center z-10">
+                            {Number(item.badge) > 99 ? '99+' : Number(item.badge)}
+                          </span>
+                        ) : (
+                          <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-semibold w-4 h-4 rounded-md flex items-center justify-center z-10">
+                            {Number(item.badge) > 99 ? '99+' : Number(item.badge)}
+                          </span>
+                        )
+                      )}
+                    </NavLink>
+                  )}
+                  {item.children && sidebarOpen && usersOpen && (
+                    <div className="mb-1 ml-6 mr-2">
+                      {item.children.map((child) => (
+                        <NavLink
+                          key={child.id}
+                          to={child.path}
+                          end={child.path === '/users'}
+                          className={({ isActive }) =>
+                            `block truncate rounded-md px-2 py-1 text-[11px] ${
+                              isActive
+                                ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                                : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700/60'
+                            }`
+                          }
+                        >
+                          {child.label}
+                        </NavLink>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </nav>
 
           {/* Logout */}

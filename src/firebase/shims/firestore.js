@@ -160,7 +160,10 @@ export const onSnapshot = (ref, onNext, onError) => {
   const emit = () => {
     try {
       const snap = ref?.group ? groupDocs(path) : makeSnapshot(path, ref?.constraints)
-      callback(snap)
+      Promise.resolve(callback(snap)).catch((error) => {
+        if (typeof onError === 'function') onError(error)
+        else console.error(error)
+      })
     } catch (error) {
       if (typeof onError === 'function') onError(error)
     }

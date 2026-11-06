@@ -99,7 +99,14 @@ const HostsAnalytics = ({ metrics, availability, detailsOpen, onToggleDetails })
     {detailsOpen && (
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
         <div className="lg:col-span-4">
-          <Panel title="Location">
+          <Panel
+            title="Location"
+            action={
+              <Link to="/geo-analytics" className="text-xs font-medium text-gray-600 hover:underline">
+                Geography
+              </Link>
+            }
+          >
             {!availability.location ? (
               <p className="text-sm text-gray-500">Country/city is not stored on user documents.</p>
             ) : (

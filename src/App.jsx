@@ -6,6 +6,8 @@ import ErrorBoundary from './components/ErrorBoundary'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Users from './pages/Users'
+import UserProfile from './pages/UserProfile'
+import UserAnalytics from './pages/UserAnalytics'
 import Transactions from './pages/Transactions'
 import TicketsV2 from './pages/TicketsV2'
 import Chats from './pages/Chats'
@@ -17,6 +19,8 @@ import Feedback from './pages/Feedback'
 import Events from './pages/Events'
 import Settings from './pages/Settings'
 import Complaints from './pages/Complaints'
+import GeoAnalytics from './pages/GeoAnalytics'
+import DiamondSellers from './pages/DiamondSellers'
 
 function App() {
   return (
@@ -39,6 +43,9 @@ function App() {
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="users" element={<Users />} />
+            <Route path="users/analytics" element={<UserAnalytics />} />
+            <Route path="users/profile/:userId" element={<UserProfile />} />
+            <Route path="users/:segment" element={<Users />} />
             <Route path="transactions" element={<Transactions />} />
             <Route path="tickets" element={<TicketsV2 />} />
             <Route path="chats" element={<Chats />} />
@@ -49,6 +56,8 @@ function App() {
             <Route path="feedback" element={<Feedback />} />
             <Route path="events" element={<Events />} />
             <Route path="complaints" element={<Complaints />} />
+            <Route path="geo-analytics" element={<GeoAnalytics />} />
+            <Route path="diamond-sellers" element={<DiamondSellers />} />
             <Route path="settings" element={<Settings />} />
             </Route>
           </Routes>
