@@ -23,7 +23,6 @@ import { useApp } from '../context/AppContext'
 import {
   addComplaintNote,
   ALL_CATEGORY_ITEMS,
-  COMPLAINT_ADMINS,
   COMPLAINT_PRIORITIES,
   COMPLAINT_STATUSES,
   formatWhen,
@@ -305,7 +304,6 @@ const Complaints = () => {
                     <td className="px-3 py-2">
                       <ActionMenu
                         onView={() => open(row.id)}
-                        onAssign={() => { setSelectedId(row.id); setAssignTo(row.assigned === 'Unassigned' ? 'Admin User' : row.assigned); setAssignOpen(true) }}
                         onStatus={() => { setSelectedId(row.id); setNextStatus(row.status); setStatusOpen(true) }}
                       />
                     </td>
@@ -458,27 +456,6 @@ const Complaints = () => {
           </aside>
         </div>
       )}
-
-      <Modal isOpen={assignOpen} onClose={() => setAssignOpen(false)} title="Assign complaint" size="sm">
-        <select className="input-field" value={assignTo} onChange={(e) => setAssignTo(e.target.value)}>
-          {COMPLAINT_ADMINS.map((item) => <option key={item}>{item}</option>)}
-        </select>
-        <div className="mt-4 flex justify-end gap-2">
-          <button type="button" className="rounded-md border px-3 py-1.5 text-xs" onClick={() => setAssignOpen(false)}>Cancel</button>
-          <button
-            type="button"
-            className="rounded-md bg-gray-900 px-3 py-1.5 text-xs text-white"
-            onClick={() => {
-              mutateComplaint(selectedId, { assigned: assignTo }, { at: new Date(), actor: 'Admin User', action: `Assigned to ${assignTo}` })
-              setAssignOpen(false)
-              refresh()
-              showToast(`Assigned to ${assignTo} on sample queue`, 'success')
-            }}
-          >
-            Assign
-          </button>
-        </div>
-      </Modal>
 
       <Modal isOpen={statusOpen} onClose={() => setStatusOpen(false)} title="Update status" size="sm">
         <select className="input-field" value={nextStatus} onChange={(e) => setNextStatus(e.target.value)}>
