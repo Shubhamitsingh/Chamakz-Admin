@@ -6,6 +6,9 @@ import SearchBar from '../components/SearchBar'
 import Table from '../components/Table'
 import Modal from '../components/Modal'
 import Loader from '../components/Loader'
+import PageHeader from '../components/PageHeader'
+import Panel from '../components/Panel'
+import KpiCard from '../components/KpiCard'
 import { collection, getDocs, getDoc, doc, updateDoc, deleteDoc, query, collectionGroup, serverTimestamp } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import EmptyState from '../components/EmptyState'
@@ -351,7 +354,7 @@ const Feedback = () => {
       header: 'Feedback ID', 
       accessor: 'feedbackId',
       render: (row) => (
-        <span className="font-mono font-semibold text-pink-600 dark:text-pink-400">
+        <span className="font-mono font-semibold text-gray-900 dark:text-gray-100">
           #{row.feedbackId}
         </span>
       )
@@ -362,7 +365,7 @@ const Feedback = () => {
       render: (row) => (
         <div>
           <p className="font-medium">{row.username}</p>
-          <p className="text-xs text-pink-600 dark:text-pink-400 font-mono font-bold">
+          <p className="text-xs text-gray-900 dark:text-gray-100 font-mono font-bold">
             ID: {row.numericUserId}
           </p>
           {row.email !== 'N/A' && (
@@ -399,7 +402,7 @@ const Feedback = () => {
       header: 'Status',
       accessor: 'status',
       render: (row) => (
-        <span className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getStatusColor(row.status)}`}>
+        <span className={`px-2 py-0.5 rounded-md text-[11px] font-medium capitalize ${getStatusColor(row.status)}`}>
           {row.status}
         </span>
       ),
@@ -430,7 +433,7 @@ const Feedback = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex min-h-[40vh] items-center justify-center">
         <Loader />
       </div>
     )
@@ -439,55 +442,15 @@ const Feedback = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-          <div className="w-10 h-10 bg-pink-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(-5deg)' }}>
-            <MessageCircle className="w-6 h-6 text-white" />
-          </div>
-          Feedback
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400">Review user feedback, suggestions, and app reviews</p>
-        {foundIn && (
-          <p className="text-sm text-green-600 dark:text-green-400 mt-2">
-            ✅ Feedback loaded from: {foundIn}
-          </p>
-        )}
-      </motion.div>
+      <PageHeader
+        title="Feedback"
+        description={foundIn ? `User feedback and app reviews. Source: ${foundIn}` : 'User feedback, suggestions, and app reviews.'}
+      />
 
-      {/* Status Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="card flex items-center gap-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-            <MessageSquare className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Total Feedback</p>
-            <p className="text-2xl font-bold">{statusCounts.all}</p>
-          </div>
-        </motion.div>
-
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="card flex items-center gap-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-lg flex items-center justify-center">
-            <Clock className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">New Feedback</p>
-            <p className="text-2xl font-bold">{statusCounts.new}</p>
-          </div>
-        </motion.div>
-
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="card flex items-center gap-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
-            <CheckCircle className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Read</p>
-            <p className="text-2xl font-bold">{statusCounts.read}</p>
-          </div>
-        </motion.div>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+        <KpiCard title="Total feedback" value={statusCounts.all} icon={MessageSquare} />
+        <KpiCard title="New" value={statusCounts.new} icon={Clock} />
+        <KpiCard title="Read" value={statusCounts.read} icon={CheckCircle} />
       </div>
 
       {/* Tabs */}
@@ -501,7 +464,7 @@ const Feedback = () => {
             onClick={() => setActiveTab('new')}
             className={`flex items-center gap-2 px-4 py-3 font-medium transition-colors relative ${
               activeTab === 'new'
-                ? 'text-pink-600 dark:text-pink-400'
+                ? 'text-gray-900 dark:text-gray-100'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
             }`}
           >
@@ -513,7 +476,7 @@ const Feedback = () => {
             {activeTab === 'new' && (
               <motion.div
                 layoutId="feedbackTab"
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-600"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-900 dark:bg-white"
               />
             )}
           </button>
@@ -521,7 +484,7 @@ const Feedback = () => {
             onClick={() => setActiveTab('read')}
             className={`flex items-center gap-2 px-4 py-3 font-medium transition-colors relative ${
               activeTab === 'read'
-                ? 'text-pink-600 dark:text-pink-400'
+                ? 'text-gray-900 dark:text-gray-100'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
             }`}
           >
@@ -533,7 +496,7 @@ const Feedback = () => {
             {activeTab === 'read' && (
               <motion.div
                 layoutId="feedbackTab"
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-600"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-900 dark:bg-white"
               />
             )}
           </button>
@@ -552,7 +515,7 @@ const Feedback = () => {
       {/* Feedback Table */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="card">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold">
+          <h2 className="text-sm font-semibold">
             {activeTab === 'new' ? 'New Feedback' : 'Read Feedback'} ({filteredFeedback.length})
           </h2>
         </div>
@@ -581,16 +544,16 @@ const Feedback = () => {
           <div className="space-y-6">
             <div className="flex items-start justify-between">
               <div>
-                <h3 className="text-xl font-bold mb-1">{selectedFeedback.subject}</h3>
+                <h3 className="text-sm font-semibold mb-1">{selectedFeedback.subject}</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Feedback #{selectedFeedback.feedbackId}</p>
                 <p className="text-xs text-gray-500 mt-1 font-mono">{selectedFeedback.path}</p>
               </div>
               <div className="flex gap-2">
-                <span className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getStatusColor(selectedFeedback.status)}`}>
+                <span className={`px-2 py-0.5 rounded-md text-[11px] font-medium capitalize ${getStatusColor(selectedFeedback.status)}`}>
                   {selectedFeedback.status}
                 </span>
                 {selectedFeedback.rating && (
-                  <div className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
+                  <div className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
                     <span>★</span>
                     <span>{selectedFeedback.rating}/5</span>
                   </div>
@@ -607,7 +570,7 @@ const Feedback = () => {
                 </div>
                 <div>
                   <span className="text-gray-600 dark:text-gray-400">User ID:</span>
-                  <span className="ml-2 font-bold text-pink-600 dark:text-pink-400 font-mono">
+                  <span className="ml-2 font-bold text-gray-900 dark:text-gray-100 font-mono">
                     {selectedFeedback.numericUserId}
                   </span>
                 </div>

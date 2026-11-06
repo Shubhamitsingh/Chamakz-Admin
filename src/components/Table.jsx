@@ -1,30 +1,22 @@
-import { motion } from 'framer-motion'
-
 const Table = ({ columns, data, onRowClick }) => {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full">
+      <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-gray-200 dark:border-gray-700">
+          <tr className="text-left text-[11px] uppercase tracking-wide text-gray-500 border-b border-gray-100 dark:border-gray-700">
             {columns.map((column, index) => (
-              <th
-                key={index}
-                className="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider"
-              >
+              <th key={index} className="py-2 px-3 font-medium">
                 {column.header}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
+        <tbody>
           {data.map((row, rowIndex) => (
-            <motion.tr
-              key={rowIndex}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: rowIndex * 0.05 }}
+            <tr
+              key={row.id || rowIndex}
               onClick={() => onRowClick && onRowClick(row)}
-              className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
+              className={`border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/40 ${
                 onRowClick ? 'cursor-pointer' : ''
               }`}
             >
@@ -34,20 +26,17 @@ const Table = ({ columns, data, onRowClick }) => {
                   cellContent = column.render(row)
                 } else {
                   const value = row[column.accessor]
-                  // Convert Firebase Timestamps and other objects to strings
                   if (value && typeof value === 'object') {
                     if (value.toDate && typeof value.toDate === 'function') {
-                      // Firebase Timestamp
                       try {
                         cellContent = new Date(value.toDate()).toLocaleDateString()
-                      } catch (e) {
+                      } catch {
                         cellContent = 'N/A'
                       }
                     } else if (value.seconds !== undefined) {
-                      // Timestamp-like object
                       try {
                         cellContent = new Date(value.seconds * 1000).toLocaleDateString()
-                      } catch (e) {
+                      } catch {
                         cellContent = 'N/A'
                       }
                     } else {
@@ -58,12 +47,12 @@ const Table = ({ columns, data, onRowClick }) => {
                   }
                 }
                 return (
-                  <td key={colIndex} className="px-6 py-4 text-sm whitespace-nowrap">
+                  <td key={colIndex} className="py-2 px-3 whitespace-nowrap align-middle">
                     {cellContent}
                   </td>
                 )
               })}
-            </motion.tr>
+            </tr>
           ))}
         </tbody>
       </table>
@@ -72,22 +61,3 @@ const Table = ({ columns, data, onRowClick }) => {
 }
 
 export default Table
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

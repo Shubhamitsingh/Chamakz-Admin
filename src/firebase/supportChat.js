@@ -378,4 +378,119 @@ export const sendAdminMessage = async (chatId, messageText, adminId = 'admin') =
   }
 }
 
+/**
+ * Find user by numericUserId and create or get support chat (Admin function)
+ * @param {string} numericUserId - User's numeric ID
+ * @returns {Promise} Chat data
+ */
+export const findUserAndCreateChat = async (numericUserId) => {
+  try {
+    if (!numericUserId || numericUserId.trim() === '') {
+      return { success: false, error: 'User ID is required' }
+    }
+
+    // Search for user by numericUserId in users collection
+    const usersRef = collection(db, 'users')
+    const usersSnapshot = await getDocs(usersRef)
+    
+    let foundUser = null
+    usersSnapshot.forEach(userDoc => {
+      const userData = userDoc.data()
+      const userNumericId = userData.numericUserId || userData.numeric_user_id || userData.userNumericId || ''
+      if (userNumericId.toString() === numericUserId.toString()) {
+        foundUser = {
+          id: userDoc.id,
+          ...userData
+        }
+      }
+    })
+
+    if (!foundUser) {
+      return { success: false, error: 'User not found with this ID' }
+    }
+
+    // Get user data
+    const userId = foundUser.id
+    const userName = foundUser.name || foundUser.displayName || foundUser.userName || 'Unknown User'
+    const userEmail = foundUser.email || ''
+    const userNumericId = foundUser.numericUserId || numericUserId
+
+    // Check if chat already exists for this user
+    const chatsRef = collection(db, SUPPORT_CHATS_COLLECTION)
+    const existingChatQuery = query(
+      chatsRef,
+      where('userId', '==', userId)
+    )
+    const existingChatSnapshot = await getDocs(existingChatQuery)
+    
+    if (!existingChatSnapshot.empty) {
+      // Return existing chat
+      const existingChat = existingChatSnapshot.docs[0]
+      const chatData = existingChat.data()
+      return { 
+        success: true, 
+        chatId: existingChat.id, 
+        isNew: false,
+        chat: {
+          id: existingChat.id,
+          username: chatData.userName || chatData.username || chatData.name || userName,
+          userId: userId,
+          numericUserId: userNumericId,
+          avatar: (chatData.userName || userName).charAt(0).toUpperCase(),
+          lastMessage: chatData.lastMessage || 'No messages yet',
+          time: chatData.lastMessageTime ? new Date(chatData.lastMessageTime.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'N/A',
+          lastMessageTime: chatData.lastMessageTime,
+          unread: chatData.unreadByAdmin || 0,
+          status: chatData.status || 'active',
+          ...chatData
+        }
+      }
+    }
+    
+    // Create new support chat
+    const newChatRef = await addDoc(chatsRef, {
+      userId: userId,
+      numericUserId: userNumericId,
+      userName: userName,
+      username: userName,
+      name: userName,
+      email: userEmail,
+      status: 'active',
+      lastMessage: 'Chat started by admin',
+      lastMessageTime: serverTimestamp(),
+      lastMessageBy: 'admin',
+      unreadByAdmin: 0,
+      unreadByUser: 0,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    })
+    
+    const newChatDoc = await getDoc(newChatRef)
+    const newChatData = newChatDoc.data()
+    
+    console.log('✅ Support chat created by admin:', newChatRef.id)
+    return { 
+      success: true, 
+      chatId: newChatRef.id, 
+      isNew: true,
+      chat: {
+        id: newChatRef.id,
+        username: userName,
+        userId: userId,
+        numericUserId: userNumericId,
+        avatar: userName.charAt(0).toUpperCase(),
+        lastMessage: 'Chat started by admin',
+        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+        lastMessageTime: newChatData.lastMessageTime,
+        unread: 0,
+        status: 'active',
+        ...newChatData
+      }
+    }
+  } catch (error) {
+    console.error('Error finding user and creating chat:', error)
+    return { success: false, error: error.message }
+  }
+}
+
 

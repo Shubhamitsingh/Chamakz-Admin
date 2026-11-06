@@ -357,8 +357,8 @@ const TopNav = () => {
   }, [])
 
   return (
-    <nav className="h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-20">
-      <div className="h-full px-6 flex items-center gap-4 w-full">
+    <nav className="h-14 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-20">
+      <div className="h-full px-4 flex items-center gap-3 w-full">
         {/* Left Side */}
         <div className="flex items-center gap-4 flex-1">
           <button
@@ -376,7 +376,7 @@ const TopNav = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
               onFocus={() => searchTerm && setShowSearchResults(true)}
               placeholder="Search users, tickets, transactions..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 transition-all"
+              className="w-full pl-10 pr-4 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:ring-1 focus:ring-gray-400 focus:border-gray-400 bg-white dark:bg-gray-700 transition-all"
             />
             
             {/* Search Results Dropdown */}

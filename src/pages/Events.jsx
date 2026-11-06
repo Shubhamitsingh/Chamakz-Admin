@@ -5,6 +5,9 @@ import Modal from '../components/Modal'
 import SearchBar from '../components/SearchBar'
 import Toast from '../components/Toast'
 import Loader from '../components/Loader'
+import PageHeader from '../components/PageHeader'
+import Panel from '../components/Panel'
+import KpiCard from '../components/KpiCard'
 import EmptyState from '../components/EmptyState'
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
@@ -440,7 +443,7 @@ const Events = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex min-h-[40vh] items-center justify-center">
         <Loader />
       </div>
     )
@@ -448,10 +451,10 @@ const Events = () => {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex min-h-[40vh] items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-16 h-16 mx-auto text-red-500 mb-4" />
-          <h2 className="text-xl font-bold mb-2">Error Loading Events</h2>
+          <h2 className="text-sm font-semibold mb-2">Error Loading Events</h2>
           <p className="text-gray-600 mb-4">{error}</p>
           <button onClick={() => window.location.reload()} className="btn-primary">
             Reload Page
@@ -464,31 +467,16 @@ const Events = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between"
-      >
-        <div>
-          <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-            <div className="w-10 h-10 bg-pink-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(-5deg)' }}>
-              <Calendar className="w-6 h-6 text-white" />
-            </div>
-            Events
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Manage events, announcements, and promotional campaigns
-          </p>
-        </div>
-        <button
-          onClick={handleAddNew}
-          className="btn-primary flex items-center gap-2"
-          disabled={processing}
-        >
-          <Plus className="w-5 h-5" />
-          Add {activeTab === 'announcements' ? 'Announcement' : 'Event'}
-        </button>
-      </motion.div>
+      <PageHeader
+        title="Events"
+        description="Events, announcements, and promotional campaigns."
+        actions={
+          <button type="button" onClick={handleAddNew} className="btn-primary" disabled={processing}>
+            <Plus className="w-3.5 h-3.5" />
+            Add {activeTab === 'announcements' ? 'announcement' : 'event'}
+          </button>
+        }
+      />
 
       {/* Tabs */}
       <motion.div
@@ -502,7 +490,7 @@ const Events = () => {
             onClick={() => setActiveTab('announcements')}
             className={`flex items-center gap-2 px-4 py-3 font-medium transition-colors relative ${
               activeTab === 'announcements'
-                ? 'text-pink-600 dark:text-pink-400'
+                ? 'text-gray-900 dark:text-gray-100'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
             }`}
           >
@@ -511,7 +499,7 @@ const Events = () => {
             {activeTab === 'announcements' && (
               <motion.div
                 layoutId="activeTab"
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-600"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-900 dark:bg-white"
               />
             )}
           </button>
@@ -519,7 +507,7 @@ const Events = () => {
             onClick={() => setActiveTab('events')}
             className={`flex items-center gap-2 px-4 py-3 font-medium transition-colors relative ${
               activeTab === 'events'
-                ? 'text-pink-600 dark:text-pink-400'
+                ? 'text-gray-900 dark:text-gray-100'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
             }`}
           >
@@ -528,7 +516,7 @@ const Events = () => {
             {activeTab === 'events' && (
               <motion.div
                 layoutId="activeTab"
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-600"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-900 dark:bg-white"
               />
             )}
           </button>

@@ -13,11 +13,11 @@ const MainLayout = () => {
       <div 
         className="flex-1 flex flex-col transition-all duration-300 ease-in-out"
         style={{ 
-          marginLeft: sidebarOpen ? '280px' : '80px'
+          marginLeft: sidebarOpen ? '256px' : '72px'
         }}
       >
         <TopNav />
-        <main className="flex-1 p-6 overflow-auto">
+        <main className="flex-1 p-4 overflow-auto">
           <Outlet />
         </main>
       </div>

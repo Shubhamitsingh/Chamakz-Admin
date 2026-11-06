@@ -6,6 +6,9 @@ import SearchBar from '../components/SearchBar'
 import Table from '../components/Table'
 import Modal from '../components/Modal'
 import Loader from '../components/Loader'
+import PageHeader from '../components/PageHeader'
+import Panel from '../components/Panel'
+import KpiCard from '../components/KpiCard'
 import EmptyState from '../components/EmptyState'
 import ErrorState from '../components/ErrorState'
 import Pagination from '../components/Pagination'
@@ -361,7 +364,7 @@ const Complaints = () => {
       header: 'Complaint ID',
       accessor: 'id',
       render: (row) => (
-        <span className="font-mono text-xs font-bold text-pink-600 dark:text-pink-400">
+        <span className="font-mono text-xs font-bold text-gray-900 dark:text-gray-100">
           #{row.id.substring(0, 8).toUpperCase()}
         </span>
       )
@@ -378,7 +381,7 @@ const Complaints = () => {
           />
           <div>
             <p className="font-medium text-sm">{row.reporterName}</p>
-            <p className="text-xs text-pink-600 dark:text-pink-400 font-mono">
+            <p className="text-xs text-gray-900 dark:text-gray-100 font-mono">
               ID: {row.reporterNumericId}
             </p>
           </div>
@@ -397,7 +400,7 @@ const Complaints = () => {
           />
           <div>
             <p className="font-medium text-sm">{row.reportedName}</p>
-            <p className="text-xs text-pink-600 dark:text-pink-400 font-mono">
+            <p className="text-xs text-gray-900 dark:text-gray-100 font-mono">
               ID: {row.reportedNumericId}
             </p>
           </div>
@@ -457,171 +460,59 @@ const Complaints = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex min-h-[40vh] items-center justify-center">
         <Loader />
       </div>
     )
   }
 
   return (
-    <div className="space-y-8 relative -mt-6">
-      {/* 2D Decorative Background Elements */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-5">
-        <div className="absolute top-20 right-20 w-64 h-64 bg-pink-300 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-20 left-20 w-48 h-48 bg-red-300 rounded-full blur-2xl"></div>
+    <div className="page-shell">
+      <PageHeader title="Complaints" description="Review reports and take action." />
+
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+        <KpiCard title="Total" value={statusCounts.all} icon={AlertTriangle} />
+        <KpiCard title="Pending" value={statusCounts.pending} icon={Clock} />
+        <KpiCard title="Investigating" value={statusCounts.investigating} icon={Eye} />
+        <KpiCard title="Resolved" value={statusCounts.resolved} icon={CheckCircle} />
+        <KpiCard title="Rejected" value={statusCounts.rejected} icon={XCircle} />
       </div>
 
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="relative z-10"
-      >
-        <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-          <div className="w-10 h-10 bg-pink-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(-5deg)' }}>
-            <AlertTriangle className="w-6 h-6 text-white" />
-          </div>
-          Complaints
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          Manage user complaints and take appropriate actions
-        </p>
-      </motion.div>
-
-      {/* Status Cards - 2D Style */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 relative z-10">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }} 
-          animate={{ opacity: 1, y: 0 }} 
-          className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 flex items-center gap-4 relative overflow-hidden"
-          style={{ boxShadow: 'none' }}
+      <div className="filter-bar">
+        <SearchBar
+          placeholder="Search reporter, user, reason, or ID"
+          value={searchTerm}
+          onChange={setSearchTerm}
+        />
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          className="text-xs border rounded-md px-2 py-1.5 bg-transparent"
         >
-          <div className="absolute top-0 left-0 w-full h-1 bg-pink-500 rounded-t-2xl"></div>
-          <div className="w-14 h-14 bg-pink-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(-5deg)' }}>
-            <AlertTriangle className="w-7 h-7 text-white" />
-          </div>
-          <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Total</p>
-            <p className="text-2xl font-bold">{statusCounts.all}</p>
-          </div>
-        </motion.div>
-
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }} 
-          animate={{ opacity: 1, y: 0 }} 
-          transition={{ delay: 0.1 }} 
-          className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 flex items-center gap-4 relative overflow-hidden"
-          style={{ boxShadow: 'none' }}
-        >
-          <div className="absolute top-0 left-0 w-full h-1 bg-yellow-500 rounded-t-2xl"></div>
-          <div className="w-14 h-14 bg-yellow-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(5deg)' }}>
-            <Clock className="w-7 h-7 text-white" />
-          </div>
-          <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Pending</p>
-            <p className="text-2xl font-bold">{statusCounts.pending}</p>
-          </div>
-        </motion.div>
-
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }} 
-          animate={{ opacity: 1, y: 0 }} 
-          transition={{ delay: 0.2 }} 
-          className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 flex items-center gap-4 relative overflow-hidden"
-          style={{ boxShadow: 'none' }}
-        >
-          <div className="absolute top-0 left-0 w-full h-1 bg-blue-500 rounded-t-2xl"></div>
-          <div className="w-14 h-14 bg-blue-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(-5deg)' }}>
-            <Eye className="w-7 h-7 text-white" />
-          </div>
-          <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Investigating</p>
-            <p className="text-2xl font-bold">{statusCounts.investigating}</p>
-          </div>
-        </motion.div>
-
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }} 
-          animate={{ opacity: 1, y: 0 }} 
-          transition={{ delay: 0.3 }} 
-          className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 flex items-center gap-4 relative overflow-hidden"
-          style={{ boxShadow: 'none' }}
-        >
-          <div className="absolute top-0 left-0 w-full h-1 bg-green-500 rounded-t-2xl"></div>
-          <div className="w-14 h-14 bg-green-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(5deg)' }}>
-            <CheckCircle className="w-7 h-7 text-white" />
-          </div>
-          <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Resolved</p>
-            <p className="text-2xl font-bold">{statusCounts.resolved}</p>
-          </div>
-        </motion.div>
-
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }} 
-          animate={{ opacity: 1, y: 0 }} 
-          transition={{ delay: 0.4 }} 
-          className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 flex items-center gap-4 relative overflow-hidden"
-          style={{ boxShadow: 'none' }}
-        >
-          <div className="absolute top-0 left-0 w-full h-1 bg-red-500 rounded-t-2xl"></div>
-          <div className="w-14 h-14 bg-red-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(-5deg)' }}>
-            <XCircle className="w-7 h-7 text-white" />
-          </div>
-          <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Rejected</p>
-            <p className="text-2xl font-bold">{statusCounts.rejected}</p>
-          </div>
-        </motion.div>
+          <option value="all">All complaints</option>
+          <option value="pending">Pending</option>
+          <option value="investigating">Investigating</option>
+          <option value="resolved">Resolved</option>
+          <option value="rejected">Rejected</option>
+        </select>
+        <ExportButton
+          data={filteredComplaints}
+          columns={columns}
+          filename="complaints"
+          disabled={filteredComplaints.length === 0}
+        />
       </div>
-
-      {/* Filters */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }} 
-        animate={{ opacity: 1, y: 0 }} 
-        className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 relative z-10"
-        style={{ boxShadow: 'none' }}
-      >
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-          <SearchBar
-            placeholder="Search by reporter, reported user, reason, or ID..."
-            value={searchTerm}
-            onChange={setSearchTerm}
-          />
-          <div className="flex gap-2 items-center">
-            <Filter className="w-5 h-5 text-gray-500" />
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="input-field"
-            >
-              <option value="all">All Complaints</option>
-              <option value="pending">Pending</option>
-              <option value="investigating">Investigating</option>
-              <option value="resolved">Resolved</option>
-              <option value="rejected">Rejected</option>
-            </select>
-            <ExportButton
-              data={filteredComplaints}
-              columns={columns}
-              filename="complaints"
-              disabled={filteredComplaints.length === 0}
-            />
-          </div>
-        </div>
-      </motion.div>
 
       {/* Complaints Table */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }} 
         animate={{ opacity: 1, y: 0 }} 
         transition={{ delay: 0.1 }} 
-        className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 relative z-10"
-        style={{ boxShadow: 'none' }}
+        className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 relative z-10"
       >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold flex items-center gap-2">
-            <div className="w-1 h-6 bg-pink-500 rounded-full"></div>
+          <h2 className="text-sm font-semibold flex items-center gap-2">
+            <div className="w-1 h-4 bg-gray-900 dark:bg-white rounded-full"></div>
             Complaints ({filteredComplaints.length})
           </h2>
         </div>
@@ -695,7 +586,7 @@ const Complaints = () => {
                 />
                 <div>
                   <p className="font-medium">{selectedComplaint.reporterName}</p>
-                  <p className="text-sm text-pink-600 dark:text-pink-400 font-mono">
+                  <p className="text-sm text-gray-900 dark:text-gray-100 font-mono">
                     ID: {selectedComplaint.reporterNumericId}
                   </p>
                 </div>
@@ -708,7 +599,7 @@ const Complaints = () => {
                 <div>
                   <button
                     onClick={() => handleViewUser(selectedComplaint.reporterId)}
-                    className="text-pink-600 dark:text-pink-400 hover:underline text-sm font-medium"
+                    className="text-gray-900 dark:text-gray-100 hover:underline text-sm font-medium"
                   >
                     View Reporter Profile →
                   </button>
@@ -730,7 +621,7 @@ const Complaints = () => {
                 />
                 <div>
                   <p className="font-medium">{selectedComplaint.reportedName}</p>
-                  <p className="text-sm text-pink-600 dark:text-pink-400 font-mono">
+                  <p className="text-sm text-gray-900 dark:text-gray-100 font-mono">
                     ID: {selectedComplaint.reportedNumericId}
                   </p>
                 </div>
@@ -743,7 +634,7 @@ const Complaints = () => {
                 <div>
                   <button
                     onClick={() => handleViewUser(selectedComplaint.reportedId)}
-                    className="text-pink-600 dark:text-pink-400 hover:underline text-sm font-medium"
+                    className="text-gray-900 dark:text-gray-100 hover:underline text-sm font-medium"
                   >
                     View Reported User Profile →
                   </button>
@@ -778,7 +669,7 @@ const Complaints = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     onClick={() => handleViewUser(selectedComplaint.reportedId)}
-                    className="px-4 py-2.5 border-2 border-pink-300 dark:border-pink-700 text-pink-600 dark:text-pink-400 rounded-lg hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors font-semibold flex items-center justify-center gap-2"
+                    className="px-4 py-2.5 border-2 border-pink-300 dark:border-pink-700 text-gray-900 dark:text-gray-100 rounded-lg hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors font-semibold flex items-center justify-center gap-2"
                     disabled={processing}
                   >
                     <Eye className="w-4 h-4" />
@@ -829,7 +720,7 @@ const Complaints = () => {
               <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <button
                   onClick={() => handleViewUser(selectedComplaint.reportedId)}
-                  className="flex-1 px-4 py-2.5 border-2 border-pink-300 dark:border-pink-700 text-pink-600 dark:text-pink-400 rounded-lg hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors font-semibold flex items-center justify-center gap-2"
+                  className="flex-1 px-4 py-2.5 border-2 border-pink-300 dark:border-pink-700 text-gray-900 dark:text-gray-100 rounded-lg hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors font-semibold flex items-center justify-center gap-2"
                 >
                   <Eye className="w-4 h-4" />
                   View Reported User
@@ -861,8 +752,8 @@ const Complaints = () => {
                 size="xl"
               />
               <div>
-                <h3 className="text-xl font-bold">{selectedUser.name}</h3>
-                <p className="text-sm text-pink-600 dark:text-pink-400 font-mono">
+                <h3 className="text-sm font-semibold">{selectedUser.name}</h3>
+                <p className="text-sm text-gray-900 dark:text-gray-100 font-mono">
                   ID: {selectedUser.numericUserId}
                 </p>
               </div>
@@ -903,7 +794,7 @@ const Complaints = () => {
                   setShowUserModal(false)
                   window.location.href = `/users?search=${selectedUser.numericUserId}`
                 }}
-                className="w-full px-4 py-2.5 bg-pink-600 hover:bg-pink-700 text-white rounded-lg font-semibold transition-colors"
+                className="w-full px-4 py-2.5 bg-gray-900 dark:bg-white hover:bg-pink-700 text-white rounded-lg font-semibold transition-colors"
               >
                 View Full Profile in Users Page
               </button>

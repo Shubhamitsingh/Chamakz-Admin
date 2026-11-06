@@ -3,6 +3,8 @@ import { motion } from 'framer-motion'
 import { Send, Image as ImageIcon, X, Users, MessageSquare, Trash2, AlertTriangle, UsersRound } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import Loader from '../components/Loader'
+import PageHeader from '../components/PageHeader'
+import Panel from '../components/Panel'
 import Modal from '../components/Modal'
 import { collection, addDoc, serverTimestamp, onSnapshot, query, orderBy, deleteDoc, doc } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
@@ -247,43 +249,24 @@ const ChamakzTeam = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex min-h-[40vh] items-center justify-center">
         <Loader />
       </div>
     )
   }
 
   return (
-    <div className="space-y-8">
+    <div className="page-shell">
       {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between"
-      >
-        <div>
-          <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-            <div className="w-10 h-10 bg-pink-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(-5deg)' }}>
-              <UsersRound className="w-6 h-6 text-white" />
-            </div>
-            Chamakz Team
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Send announcements and messages to all users
-          </p>
-        </div>
-      </motion.div>
+      <PageHeader title="Chamakz Team" description="Send announcements and messages to all users." />
 
       {/* Message Composition Card */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="card"
+        className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4"
       >
-        <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-          <MessageSquare className="w-5 h-5" />
-          Send Message to All Users
-        </h2>
+        <h2 className="text-sm font-semibold mb-3">Send message to all users</h2>
 
         {/* Message Input */}
         <div className="mb-4">
@@ -310,7 +293,7 @@ const ChamakzTeam = () => {
                 className="hidden"
                 disabled={sending || uploading}
               />
-              <div className="flex items-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-primary-500 dark:hover:border-primary-500 transition-colors">
+              <div className="flex items-center gap-2 px-4 py-2 border border-dashed border-gray-300 dark:border-gray-600 rounded-md transition-colors">
                 <ImageIcon className="w-5 h-5 text-gray-500" />
                 <span className="text-sm text-gray-600 dark:text-gray-400">
                   {selectedImage ? selectedImage.name : 'Select image'}
@@ -380,7 +363,7 @@ const ChamakzTeam = () => {
         transition={{ delay: 0.1 }}
         className="card"
       >
-        <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+        <h2 className="text-sm font-semibold mb-4 flex items-center gap-2">
           <Users className="w-5 h-5" />
           Previous Messages ({messages.length})
         </h2>
@@ -403,7 +386,7 @@ const ChamakzTeam = () => {
               >
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1">
-                    <p className="font-semibold text-pink-600 dark:text-pink-400">
+                    <p className="font-semibold text-gray-900 dark:text-gray-100">
                       {msg.sender || msg.senderName || 'Admin'}
                     </p>
                     <p className="text-xs text-gray-500">

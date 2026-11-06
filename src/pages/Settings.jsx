@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Save, Upload, Shield, Bell, Palette, Settings as SettingsIcon } from 'lucide-react'
 import { useApp } from '../context/AppContext'
+import PageHeader from '../components/PageHeader'
+import Panel from '../components/Panel'
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore'
 import { updatePassword, updateProfile } from 'firebase/auth'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
@@ -184,20 +186,9 @@ const Settings = () => {
   }
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="page-shell pb-16">
       {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-          <div className="w-10 h-10 bg-pink-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(-5deg)' }}>
-            <SettingsIcon className="w-6 h-6 text-white" />
-          </div>
-          Settings
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400">Configure application settings and admin preferences</p>
-      </motion.div>
+      <PageHeader title="Settings" description="Application settings and admin preferences." />
 
       <div className="space-y-6">
           {/* General Settings */}
@@ -206,12 +197,7 @@ const Settings = () => {
             animate={{ opacity: 1, y: 0 }}
             className="card"
           >
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-lg flex items-center justify-center">
-                <Palette className="w-5 h-5 text-white" />
-              </div>
-              <h2 className="text-xl font-bold">General Settings</h2>
-            </div>
+            <h2 className="text-sm font-semibold mb-3">General</h2>
 
             <div className="space-y-4">
               <div>
@@ -254,7 +240,7 @@ const Settings = () => {
                 <label className="block text-sm font-medium mb-2">Theme</label>
                 <button
                   onClick={toggleDarkMode}
-                  className={`w-full p-4 rounded-lg border-2 transition-all ${
+                  className={`w-full p-3 rounded-md border transition-all ${
                     darkMode
                       ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
                       : 'border-gray-300 dark:border-gray-600'
@@ -282,7 +268,7 @@ const Settings = () => {
               <div className="w-10 h-10 bg-gradient-to-br from-secondary-500 to-secondary-600 rounded-lg flex items-center justify-center">
                 <Shield className="w-5 h-5 text-white" />
               </div>
-              <h2 className="text-xl font-bold">Admin Profile</h2>
+              <h2 className="text-sm font-semibold">Admin Profile</h2>
             </div>
 
             <div className="space-y-4">
@@ -382,7 +368,7 @@ const Settings = () => {
               <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
                 <Bell className="w-5 h-5 text-white" />
               </div>
-              <h2 className="text-xl font-bold">Notification Settings</h2>
+              <h2 className="text-sm font-semibold">Notification Settings</h2>
             </div>
 
             <div className="space-y-4">
@@ -411,7 +397,7 @@ const Settings = () => {
             transition={{ delay: 0.4 }}
             onClick={handleSave}
             disabled={saving || loading}
-            className="btn-primary w-full py-4 text-lg flex items-center justify-center gap-2 disabled:opacity-50"
+            className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {saving ? (
               <>

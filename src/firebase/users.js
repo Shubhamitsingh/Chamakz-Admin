@@ -406,6 +406,55 @@ export const fixIncorrectNewUserPermissions = async (daysSinceCreation = 7) => {
   }
 }
 
+/**
+ * Backfill role field for approved hosts missing role: 'Host'
+ * This function finds users who:
+ * - Have isActive: true (approved for live streaming)
+ * - Don't have role: 'Host' or have incorrect role
+ * And sets their role to 'Host' with all required fields
+ * @returns {Promise} Success status with count of updated users
+ */
+export const backfillHostRoles = async () => {
+  try {
+    const usersCollection = collection(db, USERS_COLLECTION)
+    const snapshot = await getDocs(usersCollection)
+    
+    let updatedCount = 0
+    const updatePromises = []
+    
+    snapshot.forEach((docSnapshot) => {
+      const data = docSnapshot.data()
+      
+      // Check if user is approved (isActive: true) but missing role: 'Host'
+      if (data.isActive === true && data.role !== 'Host') {
+        const userRef = doc(db, USERS_COLLECTION, docSnapshot.id)
+        updatePromises.push(
+          updateDoc(userRef, {
+            role: 'Host',
+            isHost: true,
+            hostStatus: 'approved',
+            updatedAt: serverTimestamp()
+          })
+        )
+        updatedCount++
+        console.log(`🔧 Backfilling user ${docSnapshot.id}: Adding role: 'Host'`)
+      }
+    })
+    
+    // Execute all updates
+    await Promise.all(updatePromises)
+    
+    return { 
+      success: true, 
+      updatedCount,
+      message: `Successfully updated ${updatedCount} host(s) with role field`
+    }
+  } catch (error) {
+    console.error('Error backfilling host roles:', error)
+    return { success: false, error: error.message }
+  }
+}
+
 
 
 

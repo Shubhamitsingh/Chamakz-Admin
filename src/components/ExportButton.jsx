@@ -68,7 +68,7 @@ const ExportButton = ({
       <button
         onClick={() => setShowMenu(!showMenu)}
         disabled={exporting || disabled}
-        className="inline-flex items-center gap-2 px-4 py-2 bg-pink-500 hover:bg-pink-600 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className="btn-secondary"
       >
         <Download className="w-4 h-4" />
         {exporting ? 'Exporting...' : 'Export'}
@@ -77,7 +77,7 @@ const ExportButton = ({
 
       {showMenu && (
         <div 
-          className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border-2 border-gray-200 dark:border-gray-700"
+          className="absolute right-0 mt-1 w-44 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700"
           style={{ zIndex: 10000 }}
         >
           <div className="py-1">

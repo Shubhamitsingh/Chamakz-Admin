@@ -6,6 +6,9 @@ import SearchBar from '../components/SearchBar'
 import Table from '../components/Table'
 import Modal from '../components/Modal'
 import Loader from '../components/Loader'
+import PageHeader from '../components/PageHeader'
+import Panel from '../components/Panel'
+import KpiCard from '../components/KpiCard'
 import EmptyState from '../components/EmptyState'
 import { collection, getDocs, getDoc, doc, updateDoc, deleteDoc, query, collectionGroup, serverTimestamp } from 'firebase/firestore'
 import { db } from '../firebase/config'
@@ -346,7 +349,7 @@ const TicketsV2 = () => {
       header: 'Ticket ID', 
       accessor: 'ticketId',
       render: (row) => (
-        <span className="font-mono font-semibold text-pink-600 dark:text-pink-400">
+        <span className="font-mono font-semibold text-gray-900 dark:text-gray-100">
           #{row.ticketId}
         </span>
       )
@@ -357,7 +360,7 @@ const TicketsV2 = () => {
       render: (row) => (
         <div>
           <p className="font-medium">{row.username}</p>
-          <p className="text-xs text-pink-600 dark:text-pink-400 font-mono font-bold">
+          <p className="text-xs text-gray-900 dark:text-gray-100 font-mono font-bold">
             ID: {row.numericUserId}
           </p>
           {row.email !== 'N/A' && (
@@ -380,7 +383,7 @@ const TicketsV2 = () => {
       header: 'Category',
       accessor: 'category',
       render: (row) => (
-        <span className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getCategoryColor(row.category)}`}>
+        <span className={`px-2 py-0.5 rounded-md text-[11px] font-medium capitalize ${getCategoryColor(row.category)}`}>
           {row.category || 'General'}
         </span>
       ),
@@ -389,7 +392,7 @@ const TicketsV2 = () => {
       header: 'Status',
       accessor: 'status',
       render: (row) => (
-        <span className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getStatusColor(row.status)}`}>
+        <span className={`px-2 py-0.5 rounded-md text-[11px] font-medium capitalize ${getStatusColor(row.status)}`}>
           {row.status}
         </span>
       ),
@@ -398,7 +401,7 @@ const TicketsV2 = () => {
       header: 'Priority',
       accessor: 'priority',
       render: (row) => (
-        <span className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getPriorityColor(row.priority)}`}>
+        <span className={`px-2 py-0.5 rounded-md text-[11px] font-medium capitalize ${getPriorityColor(row.priority)}`}>
           {row.priority}
         </span>
       ),
@@ -434,106 +437,37 @@ const TicketsV2 = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex min-h-[40vh] items-center justify-center">
         <Loader />
       </div>
     )
   }
 
   return (
-    <div className="space-y-8 relative -mt-4">
-      {/* 2D Decorative Background Elements */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-5">
-        <div className="absolute top-20 right-20 w-64 h-64 bg-purple-300 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-20 left-20 w-48 h-48 bg-orange-300 rounded-full blur-2xl"></div>
-      </div>
+    <div className="page-shell">
+      <PageHeader
+        title="Tickets / Support"
+        description={foundIn ? `Manage support tickets. Source: ${foundIn}` : 'Manage and resolve customer support tickets.'}
+      />
 
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="relative z-10"
-      >
-        <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-          <div className="w-10 h-10 bg-pink-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(-5deg)' }}>
-            <Ticket className="w-6 h-6 text-white" />
-          </div>
-          Tickets / Support
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400">Manage and resolve customer support tickets</p>
-        {foundIn && (
-          <p className="text-sm text-green-600 dark:text-green-400 mt-2">
-            ✅ Tickets loaded from: {foundIn}
-          </p>
-        )}
-      </motion.div>
-
-      {/* Status Cards - 2D Style */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 relative z-10">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }} 
-          animate={{ opacity: 1, y: 0 }} 
-          className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 flex items-center gap-4 relative overflow-hidden"
-          style={{ boxShadow: 'none' }}
-        >
-          <div className="absolute top-0 left-0 w-full h-1 bg-pink-500 rounded-t-2xl"></div>
-          <div className="w-14 h-14 bg-pink-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(-5deg)' }}>
-            <AlertCircle className="w-7 h-7 text-white" />
-          </div>
-          <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Total Tickets</p>
-            <p className="text-2xl font-bold">{statusCounts.all}</p>
-          </div>
-        </motion.div>
-
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }} 
-          animate={{ opacity: 1, y: 0 }} 
-          transition={{ delay: 0.1 }} 
-          className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 flex items-center gap-4 relative overflow-hidden"
-          style={{ boxShadow: 'none' }}
-        >
-          <div className="absolute top-0 left-0 w-full h-1 bg-orange-500 rounded-t-2xl"></div>
-          <div className="w-14 h-14 bg-orange-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(5deg)' }}>
-            <Clock className="w-7 h-7 text-white" />
-          </div>
-          <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">In Progress</p>
-            <p className="text-2xl font-bold">{statusCounts.inProgress}</p>
-          </div>
-        </motion.div>
-
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }} 
-          animate={{ opacity: 1, y: 0 }} 
-          transition={{ delay: 0.2 }} 
-          className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 flex items-center gap-4 relative overflow-hidden"
-          style={{ boxShadow: 'none' }}
-        >
-          <div className="absolute top-0 left-0 w-full h-1 bg-purple-500 rounded-t-2xl"></div>
-          <div className="w-14 h-14 bg-purple-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(-5deg)' }}>
-            <CheckCircle className="w-7 h-7 text-white" />
-          </div>
-          <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Resolved</p>
-            <p className="text-2xl font-bold">{statusCounts.resolved}</p>
-          </div>
-        </motion.div>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+        <KpiCard title="Total tickets" value={statusCounts.all} icon={Ticket} />
+        <KpiCard title="In progress" value={statusCounts.inProgress} icon={Clock} />
+        <KpiCard title="Resolved" value={statusCounts.resolved} icon={CheckCircle} />
       </div>
 
       {/* Tabs */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 relative z-10"
-        style={{ boxShadow: 'none' }}
+        className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 relative z-10"
       >
         <div className="flex gap-4 border-b border-gray-200 dark:border-gray-700">
           <button
             onClick={() => setActiveTab('in-progress')}
             className={`flex items-center gap-2 px-4 py-3 font-medium transition-colors relative ${
               activeTab === 'in-progress'
-                ? 'text-pink-600 dark:text-pink-400'
+                ? 'text-gray-900 dark:text-gray-100'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
             }`}
           >
@@ -545,7 +479,7 @@ const TicketsV2 = () => {
             {activeTab === 'in-progress' && (
               <motion.div
                 layoutId="ticketTab"
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-pink-600"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-900 dark:bg-white"
               />
             )}
           </button>
@@ -553,7 +487,7 @@ const TicketsV2 = () => {
             onClick={() => setActiveTab('resolved')}
             className={`flex items-center gap-2 px-4 py-3 font-medium transition-colors relative ${
               activeTab === 'resolved'
-                ? 'text-pink-600 dark:text-pink-400'
+                ? 'text-gray-900 dark:text-gray-100'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
             }`}
           >
@@ -565,7 +499,7 @@ const TicketsV2 = () => {
             {activeTab === 'resolved' && (
               <motion.div
                 layoutId="ticketTab"
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-pink-600"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-900 dark:bg-white"
               />
             )}
           </button>
@@ -586,12 +520,11 @@ const TicketsV2 = () => {
         initial={{ opacity: 0, y: 20 }} 
         animate={{ opacity: 1, y: 0 }} 
         transition={{ delay: 0.1 }} 
-        className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 relative z-10"
-        style={{ boxShadow: 'none' }}
+        className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 relative z-10"
       >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold flex items-center gap-2">
-            <div className="w-1 h-6 bg-purple-500 rounded-full"></div>
+          <h2 className="text-sm font-semibold flex items-center gap-2">
+            <div className="w-1 h-4 bg-gray-900 dark:bg-white rounded-full"></div>
             {activeTab === 'in-progress' ? 'In Progress Tickets' : 'Resolved Tickets'} ({filteredTickets.length})
           </h2>
         </div>
@@ -620,15 +553,15 @@ const TicketsV2 = () => {
           <div className="space-y-6">
             <div className="flex items-start justify-between">
               <div>
-                <h3 className="text-xl font-bold mb-1">{selectedTicket.issue}</h3>
+                <h3 className="text-sm font-semibold mb-1">{selectedTicket.issue}</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Ticket #{selectedTicket.ticketId}</p>
                 <p className="text-xs text-gray-500 mt-1 font-mono">{selectedTicket.path}</p>
               </div>
               <div className="flex gap-2">
-                <span className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getStatusColor(selectedTicket.status)}`}>
+                <span className={`px-2 py-0.5 rounded-md text-[11px] font-medium capitalize ${getStatusColor(selectedTicket.status)}`}>
                   {selectedTicket.status}
                 </span>
-                <span className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getPriorityColor(selectedTicket.priority)}`}>
+                <span className={`px-2 py-0.5 rounded-md text-[11px] font-medium capitalize ${getPriorityColor(selectedTicket.priority)}`}>
                   {selectedTicket.priority}
                 </span>
               </div>
@@ -643,7 +576,7 @@ const TicketsV2 = () => {
                 </div>
                 <div>
                   <span className="text-gray-600 dark:text-gray-400">User ID:</span>
-                  <span className="ml-2 font-bold text-pink-600 dark:text-pink-400 font-mono">
+                  <span className="ml-2 font-bold text-gray-900 dark:text-gray-100 font-mono">
                     {selectedTicket.numericUserId}
                   </span>
                 </div>

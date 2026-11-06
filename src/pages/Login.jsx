@@ -102,6 +102,10 @@ const Login = () => {
           userFriendlyError = 'Too many failed attempts. Please try again later.'
         } else if (errorMessage.includes('auth/network-request-failed')) {
           userFriendlyError = 'Network error. Please check your internet connection.'
+        } else if (errorMessage.includes('auth/connection-refused') || errorMessage.includes('auth/internal-error') || errorMessage.includes('Failed to get document')) {
+          userFriendlyError = 'Cannot reach Firebase. Check your internet or try again in a few moments.'
+        } else if (errorMessage.includes('Firebase') && (errorMessage.includes('unavailable') || errorMessage.includes('connection'))) {
+          userFriendlyError = 'Firebase service is temporarily unavailable. Please try again shortly.'
         }
         
         setError(userFriendlyError)
@@ -257,7 +261,7 @@ const Login = () => {
             className="flex items-center gap-2 mb-8"
           >
             <div className="w-1 h-8 bg-pink-500 rounded-full" />
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Chamakz</h1>
+            <h1 className="text-lg font-semibold tabular-nums text-gray-900 dark:text-white">Chamakz</h1>
           </motion.div>
 
           {/* Stats Cards - Positioned around the image */}
@@ -281,7 +285,7 @@ const Login = () => {
               </div>
               <div className="flex items-end justify-between">
                 <div>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">624k</p>
+                  <p className="text-lg font-semibold tabular-nums text-gray-900 dark:text-white">624k</p>
                   <p className="text-sm text-green-600 dark:text-green-400 font-medium mt-1">
                     +8.24%
                   </p>
@@ -321,7 +325,7 @@ const Login = () => {
               </div>
               <div className="flex items-end justify-between">
                 <div>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">124k</p>
+                  <p className="text-lg font-semibold tabular-nums text-gray-900 dark:text-white">124k</p>
                   <p className="text-sm text-green-600 dark:text-green-400 font-medium mt-1">
                     +12.6%
                   </p>
@@ -394,7 +398,7 @@ const Login = () => {
         >
           {/* Welcome Message */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            <h1 className="text-lg font-semibold tracking-tight text-gray-900 dark:text-white mb-2">
               Welcome to ! <span className="text-2xl">👋</span>
             </h1>
           </div>
@@ -433,7 +437,6 @@ const Login = () => {
             onSubmit={handleSubmit} 
             className="space-y-6 relative z-10"
             style={{ position: 'relative', zIndex: 10 }}
-            onClick={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Email Field */}
@@ -533,7 +536,7 @@ const Login = () => {
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 text-pink-600 rounded border-gray-300 focus:ring-0 checked:bg-pink-600 checked:border-pink-600"
+                  className="w-4 h-4 text-pink-600 rounded border-gray-300 focus:ring-0 checked:bg-gray-900 dark:bg-white checked:border-pink-600"
                   disabled={loading}
                 />
                 <span className="text-gray-700 dark:text-gray-300">Remember me</span>
@@ -560,7 +563,7 @@ const Login = () => {
                 }
                 e.stopPropagation()
               }}
-              className="w-full bg-pink-600 hover:bg-pink-700 active:bg-pink-800 text-white font-semibold py-3.5 px-6 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed enabled:cursor-pointer enabled:hover:shadow-lg flex items-center justify-center gap-2 shadow-md relative z-10"
+              className="w-full bg-gray-900 dark:bg-white hover:bg-pink-700 active:bg-pink-800 text-white font-semibold py-3.5 px-6 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed enabled:cursor-pointer enabled:hover:shadow-lg flex items-center justify-center gap-2 shadow-md relative z-10"
               style={{ 
                 WebkitTapHighlightColor: 'transparent',
                 position: 'relative',
@@ -598,7 +601,7 @@ const Login = () => {
             onClick={(e) => e.stopPropagation()}
             className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full shadow-xl"
           >
-            <h2 className="text-2xl font-bold mb-4">Reset Password</h2>
+            <h2 className="text-lg font-semibold tabular-nums mb-4">Reset Password</h2>
             
             {resetSuccess ? (
               <div className="text-center py-4">
@@ -648,7 +651,7 @@ const Login = () => {
                     <button
                       type="submit"
                       disabled={resetLoading || !resetEmail}
-                      className="flex-1 bg-pink-600 hover:bg-pink-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex-1 bg-gray-900 dark:bg-white hover:bg-pink-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {resetLoading ? 'Sending...' : 'Send Reset Link'}
                     </button>

@@ -1,19 +1,13 @@
-import { motion } from 'framer-motion'
-
 const Loader = ({ size = 'md', fullScreen = false }) => {
   const sizes = {
-    sm: 'w-4 h-4',
-    md: 'w-8 h-8',
-    lg: 'w-12 h-12',
+    sm: 'w-4 h-4 border-2',
+    md: 'w-6 h-6 border-2',
+    lg: 'w-8 h-8 border-2',
   }
 
   const loader = (
     <div className="flex items-center justify-center">
-      <motion.div
-        className={`${sizes[size]} border-4 border-primary-200 border-t-primary-600 rounded-full`}
-        animate={{ rotate: 360 }}
-        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-      />
+      <div className={`${sizes[size]} border-gray-200 border-t-gray-900 dark:border-gray-700 dark:border-t-white rounded-full animate-spin`} />
     </div>
   )
 
@@ -29,22 +23,3 @@ const Loader = ({ size = 'md', fullScreen = false }) => {
 }
 
 export default Loader
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -3,25 +3,27 @@ import { getAuth } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
 
-// 🔥 FIREBASE CONFIGURATION
-// Connected to Chamak Firebase Project
 const firebaseConfig = {
-  apiKey: "AIzaSyCSzAowpl-4b4Vurflv5iBXRDQSC0c4ogE",
-  authDomain: "chamak-39472.firebaseapp.com",
-  projectId: "chamak-39472",
-  storageBucket: "chamak-39472.firebasestorage.app",
-  messagingSenderId: "228866341171",
-  appId: "1:228866341171:web:9deacb4ab0cf95aab2a646",
-  measurementId: "G-HN28S7YN1D"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || '',
 }
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig)
+export const isFirebaseConfigured = Boolean(
+  firebaseConfig.apiKey && firebaseConfig.projectId
+)
 
-// Initialize Firebase services
-export const auth = getAuth(app)
-export const db = getFirestore(app)
-export const storage = getStorage(app)
+const app = isFirebaseConfigured
+  ? initializeApp(firebaseConfig)
+  : initializeApp({ projectId: 'mock-local' })
 
+const auth = getAuth(app)
+const db = getFirestore(app)
+const storage = getStorage(app)
+
+export { auth, db, storage }
 export default app
-

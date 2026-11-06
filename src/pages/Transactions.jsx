@@ -5,6 +5,9 @@ import SearchBar from '../components/SearchBar'
 import Table from '../components/Table'
 import Modal from '../components/Modal'
 import Loader from '../components/Loader'
+import PageHeader from '../components/PageHeader'
+import Panel from '../components/Panel'
+import KpiCard from '../components/KpiCard'
 import EmptyState from '../components/EmptyState'
 import ErrorState from '../components/ErrorState'
 import Pagination from '../components/Pagination'
@@ -315,7 +318,7 @@ const Transactions = () => {
       header: 'Request ID',
       accessor: 'id',
       render: (row) => (
-        <span className="font-mono text-xs font-bold text-pink-600 dark:text-pink-400">
+        <span className="font-mono text-xs font-bold text-gray-900 dark:text-gray-100">
           #{row.id.substring(0, 8).toUpperCase()}
         </span>
       )
@@ -326,7 +329,7 @@ const Transactions = () => {
       render: (row) => (
         <div>
           <p className="font-medium">{row.hostName}</p>
-          <p className="text-xs text-pink-600 dark:text-pink-400 font-mono font-bold">
+          <p className="text-xs text-gray-900 dark:text-gray-100 font-mono font-bold">
             ID: {row.numericUserId}
           </p>
         </div>
@@ -337,9 +340,9 @@ const Transactions = () => {
       accessor: 'coins',
       render: (row) => (
         <div className="flex items-center gap-2">
-          <Coins className="w-4 h-4 text-pink-600 dark:text-pink-400" />
+          <Coins className="w-4 h-4 text-gray-900 dark:text-gray-100" />
           <div>
-            <span className="font-bold text-pink-600 dark:text-pink-400">
+            <span className="font-bold text-gray-900 dark:text-gray-100">
               {row.coins ? row.coins.toLocaleString() : 'N/A'}
             </span>
             <span className="text-xs text-gray-500 ml-1">coins</span>
@@ -402,154 +405,58 @@ const Transactions = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex min-h-[40vh] items-center justify-center">
         <Loader />
       </div>
     )
   }
 
   return (
-    <div className="space-y-8 relative -mt-6">
-      {/* 2D Decorative Background Elements */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-5">
-        <div className="absolute top-20 right-20 w-64 h-64 bg-pink-300 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-20 left-20 w-48 h-48 bg-purple-300 rounded-full blur-2xl"></div>
+    <div className="page-shell">
+      <PageHeader title="Transactions" description="Withdrawal requests and payment processing." />
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <KpiCard title="Total requests" value={statusCounts.all} icon={DollarSign} />
+        <KpiCard title="Pending" value={statusCounts.pending} icon={Clock} />
+        <KpiCard title="Paid" value={statusCounts.paid} icon={CheckCircle} />
+        <KpiCard title="Rejected" value={statusCounts.rejected} icon={XCircle} />
       </div>
 
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="relative z-10"
-      >
-        <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-          <div className="w-10 h-10 bg-pink-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(-5deg)' }}>
-            <DollarSign className="w-6 h-6 text-white" />
-          </div>
-          Transactions
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          Manage withdrawal requests and payment processing
-        </p>
-      </motion.div>
-
-      {/* Status Cards - 2D Style */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 relative z-10">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }} 
-          animate={{ opacity: 1, y: 0 }} 
-          className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 flex items-center gap-4 relative overflow-hidden"
-          style={{ boxShadow: 'none' }}
+      <div className="filter-bar">
+        <SearchBar
+          placeholder="Search host name, ID, or account"
+          value={searchTerm}
+          onChange={setSearchTerm}
+        />
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          className="text-xs border rounded-md px-2 py-1.5 bg-transparent"
         >
-          <div className="absolute top-0 left-0 w-full h-1 bg-pink-500 rounded-t-2xl"></div>
-          <div className="w-14 h-14 bg-pink-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(-5deg)' }}>
-            <DollarSign className="w-7 h-7 text-white" />
-          </div>
-          <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Total Requests</p>
-            <p className="text-2xl font-bold">{statusCounts.all}</p>
-          </div>
-        </motion.div>
-
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }} 
-          animate={{ opacity: 1, y: 0 }} 
-          transition={{ delay: 0.1 }} 
-          className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 flex items-center gap-4 relative overflow-hidden"
-          style={{ boxShadow: 'none' }}
-        >
-          <div className="absolute top-0 left-0 w-full h-1 bg-orange-500 rounded-t-2xl"></div>
-          <div className="w-14 h-14 bg-orange-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(5deg)' }}>
-            <Clock className="w-7 h-7 text-white" />
-          </div>
-          <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Pending</p>
-            <p className="text-2xl font-bold">{statusCounts.pending}</p>
-          </div>
-        </motion.div>
-
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }} 
-          animate={{ opacity: 1, y: 0 }} 
-          transition={{ delay: 0.2 }} 
-          className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 flex items-center gap-4 relative overflow-hidden"
-          style={{ boxShadow: 'none' }}
-        >
-          <div className="absolute top-0 left-0 w-full h-1 bg-purple-500 rounded-t-2xl"></div>
-          <div className="w-14 h-14 bg-purple-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(-5deg)' }}>
-            <CheckCircle className="w-7 h-7 text-white" />
-          </div>
-          <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Paid</p>
-            <p className="text-2xl font-bold">{statusCounts.paid}</p>
-          </div>
-        </motion.div>
-
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }} 
-          animate={{ opacity: 1, y: 0 }} 
-          transition={{ delay: 0.3 }} 
-          className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 flex items-center gap-4 relative overflow-hidden"
-          style={{ boxShadow: 'none' }}
-        >
-          <div className="absolute top-0 left-0 w-full h-1 bg-red-500 rounded-t-2xl"></div>
-          <div className="w-14 h-14 bg-red-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(5deg)' }}>
-            <XCircle className="w-7 h-7 text-white" />
-          </div>
-          <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Rejected</p>
-            <p className="text-2xl font-bold">{statusCounts.rejected}</p>
-          </div>
-        </motion.div>
+          <option value="all">All requests</option>
+          <option value="pending">Pending</option>
+          <option value="processing">Processing</option>
+          <option value="paid">Paid</option>
+          <option value="rejected">Rejected</option>
+        </select>
+        <ExportButton
+          data={filteredWithdrawals}
+          columns={columns}
+          filename="withdrawal_requests"
+          disabled={filteredWithdrawals.length === 0}
+        />
       </div>
-
-      {/* Filters */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }} 
-        animate={{ opacity: 1, y: 0 }} 
-        className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 relative z-10"
-        style={{ boxShadow: 'none', overflow: 'visible' }}
-      >
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between" style={{ overflow: 'visible' }}>
-          <SearchBar
-            placeholder="Search by host name, ID, or account..."
-            value={searchTerm}
-            onChange={setSearchTerm}
-          />
-          <div className="flex gap-2 items-center" style={{ position: 'relative', zIndex: 10001 }}>
-            <Filter className="w-5 h-5 text-gray-500" />
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="input-field"
-            >
-              <option value="all">All Requests</option>
-              <option value="pending">Pending</option>
-              <option value="processing">Processing</option>
-              <option value="paid">Paid</option>
-              <option value="rejected">Rejected</option>
-            </select>
-            <ExportButton
-              data={filteredWithdrawals}
-              columns={columns}
-              filename="withdrawal_requests"
-              disabled={filteredWithdrawals.length === 0}
-            />
-          </div>
-        </div>
-      </motion.div>
 
       {/* Withdrawals Table */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }} 
         animate={{ opacity: 1, y: 0 }} 
         transition={{ delay: 0.1 }} 
-        className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 relative z-10"
-        style={{ boxShadow: 'none' }}
+        className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 relative z-10"
       >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold flex items-center gap-2">
-            <div className="w-1 h-6 bg-pink-500 rounded-full"></div>
+          <h2 className="text-sm font-semibold flex items-center gap-2">
+            <div className="w-1 h-4 bg-gray-900 dark:bg-white rounded-full"></div>
             Withdrawal Requests ({filteredWithdrawals.length})
           </h2>
         </div>
@@ -607,11 +514,11 @@ const Transactions = () => {
               </div>
               <div className="text-right">
                 <p className="text-xs text-gray-500 mb-1">Coins</p>
-                <p className="text-lg font-bold text-pink-600 dark:text-pink-400">
+                <p className="text-lg font-bold text-gray-900 dark:text-gray-100">
                   {selectedWithdrawal.coins ? selectedWithdrawal.coins.toLocaleString() : 'N/A'} coins
                 </p>
                 <p className="text-xs text-gray-500 mb-1 mt-2">Amount</p>
-                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                <p className="text-lg font-semibold tabular-nums text-green-600 dark:text-green-400">
                   ₹{selectedWithdrawal.amount.toLocaleString()}
                 </p>
               </div>
@@ -627,7 +534,7 @@ const Transactions = () => {
                 </div>
                 <div>
                   <p className="text-gray-600 dark:text-gray-400">User ID</p>
-                  <p className="font-bold text-pink-600 dark:text-pink-400 font-mono">
+                  <p className="font-bold text-gray-900 dark:text-gray-100 font-mono">
                     {selectedWithdrawal.numericUserId}
                   </p>
                 </div>
@@ -648,7 +555,7 @@ const Transactions = () => {
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <p className="text-gray-600 dark:text-gray-400">Coins Requested</p>
-                  <p className="font-bold text-lg text-pink-600 dark:text-pink-400">
+                  <p className="font-bold text-lg text-gray-900 dark:text-gray-100">
                     {selectedWithdrawal.coins ? selectedWithdrawal.coins.toLocaleString() : 'N/A'} coins
                   </p>
                 </div>
@@ -668,7 +575,7 @@ const Transactions = () => {
                 {selectedWithdrawal.paymentMethod === 'UPI' ? (
                   <div>
                     <p className="text-gray-600 dark:text-gray-400">UPI ID</p>
-                    <p className="font-mono font-bold text-pink-600 dark:text-pink-400">
+                    <p className="font-mono font-bold text-gray-900 dark:text-gray-100">
                       {selectedWithdrawal.upiId}
                     </p>
                   </div>

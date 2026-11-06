@@ -1,106 +1,55 @@
-import { motion } from 'framer-motion'
 import { AlertCircle, RefreshCw, HelpCircle } from 'lucide-react'
 import { handleFirebaseError } from '../utils/errorHandler'
 
-/**
- * Reusable Error State Component
- * Displays error messages with retry functionality
- */
 const ErrorState = ({
   error,
   context = '',
   onRetry,
   onContactSupport,
-  className = ''
+  className = '',
 }) => {
-  const errorInfo = error ? handleFirebaseError(error, context) : {
-    userMessage: 'An error occurred',
-    technicalMessage: 'Unknown error',
-    errorCode: '',
-    canRetry: false,
-    showSupport: false
-  }
+  const errorInfo = error
+    ? handleFirebaseError(error, context)
+    : {
+        userMessage: 'An error occurred',
+        technicalMessage: 'Unknown error',
+        errorCode: '',
+        canRetry: false,
+        showSupport: false,
+      }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={`bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6 ${className}`}
-    >
-      <div className="flex items-start gap-4">
-        <div className="flex-shrink-0">
-          <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
-            <AlertCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
-          </div>
-        </div>
-        
-        <div className="flex-1">
-          <h3 className="text-lg font-semibold text-red-900 dark:text-red-300 mb-1">
-            Error Loading Data
-          </h3>
-          
-          <p className="text-red-800 dark:text-red-400 mb-3">
-            {errorInfo.userMessage}
-          </p>
-          
+    <div className={`rounded-md border border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-900 px-3 py-3 ${className}`}>
+      <div className="flex items-start gap-3">
+        <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <h3 className="text-sm font-semibold text-red-800 dark:text-red-300">Could not load data</h3>
+          <p className="mt-1 text-xs text-red-700 dark:text-red-400">{errorInfo.userMessage}</p>
+
           {errorInfo.errorCode === 'permission-denied' && (
-            <div className="bg-red-100 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-3 mb-3">
-              <p className="text-sm text-red-800 dark:text-red-300 font-medium mb-1">
-                ⚠️ Permission Issue
-              </p>
-              <p className="text-xs text-red-700 dark:text-red-400">
-                Please update Firestore security rules to allow access to this collection.
-              </p>
-            </div>
+            <p className="mt-2 text-[11px] text-red-700">Access was denied for this collection.</p>
           )}
-          
           {errorInfo.errorCode === 'failed-precondition' && (
-            <div className="bg-red-100 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-3 mb-3">
-              <p className="text-sm text-red-800 dark:text-red-300 font-medium mb-1">
-                ⚠️ Index Required
-              </p>
-              <p className="text-xs text-red-700 dark:text-red-400">
-                A Firestore index is required for this query. Please create it in Firebase Console.
-              </p>
-            </div>
+            <p className="mt-2 text-[11px] text-red-700">This query needs a database index.</p>
           )}
-          
-          <div className="flex flex-wrap gap-2">
-            {errorInfo.canRetry && onRetry && (
-              <button
-                onClick={onRetry}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors"
-              >
-                <RefreshCw className="w-4 h-4" />
+
+          <div className="flex flex-wrap gap-2 mt-3">
+            {onRetry && (
+              <button type="button" onClick={onRetry} className="btn-danger">
+                <RefreshCw className="w-3.5 h-3.5" />
                 Retry
               </button>
             )}
-            
             {errorInfo.showSupport && onContactSupport && (
-              <button
-                onClick={onContactSupport}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white text-sm font-medium rounded-lg transition-colors"
-              >
-                <HelpCircle className="w-4 h-4" />
-                Contact Support
+              <button type="button" onClick={onContactSupport} className="btn-secondary">
+                <HelpCircle className="w-3.5 h-3.5" />
+                Contact support
               </button>
             )}
           </div>
-          
-          {process.env.NODE_ENV === 'development' && (
-            <details className="mt-4">
-              <summary className="text-xs text-red-600 dark:text-red-400 cursor-pointer">
-                Technical Details
-              </summary>
-              <pre className="mt-2 text-xs text-red-700 dark:text-red-500 bg-red-100 dark:bg-red-900/30 p-2 rounded overflow-auto">
-                {errorInfo.technicalMessage}
-                {errorInfo.errorCode && `\nError Code: ${errorInfo.errorCode}`}
-              </pre>
-            </details>
-          )}
         </div>
       </div>
-    </motion.div>
+    </div>
   )
 }
 

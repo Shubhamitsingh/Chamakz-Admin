@@ -1,11 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, Search, Ban, AlertCircle, CheckCircle, Filter, X, ChevronDown, User, Calendar, Clock, ChevronRight, Info, MessageSquare } from 'lucide-react'
+import { Send, Search, Ban, AlertCircle, CheckCircle, Filter, X, ChevronDown, User, Calendar, Clock, ChevronRight, Info, MessageSquare, UserPlus } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import Loader from '../components/Loader'
+import PageHeader from '../components/PageHeader'
+import Panel from '../components/Panel'
+import KpiCard from '../components/KpiCard'
 import UserAvatar from '../components/UserAvatar'
 import { collection, query, orderBy, limit, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, getDoc } from 'firebase/firestore'
 import { db } from '../firebase/config'
+import { findUserAndCreateChat } from '../firebase/supportChat'
 
 const Chats = () => {
   const { user: adminUser, showToast } = useApp()
@@ -14,6 +18,7 @@ const Chats = () => {
   const [messages, setMessages] = useState([])
   const [message, setMessage] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
+  const [searchingUser, setSearchingUser] = useState(false)
   const [chatFilter, setChatFilter] = useState('all') // 'all', 'unread', 'active', 'closed'
   const [showUserInfo, setShowUserInfo] = useState(false)
   const [showScrollButton, setShowScrollButton] = useState(false)
@@ -318,6 +323,69 @@ const Chats = () => {
     setSending(false)
   }
 
+  // Handle search - if user presses Enter and search is a numeric ID, try to find/create chat
+  const handleSearchKeyPress = async (e) => {
+    if (e.key === 'Enter' && searchTerm.trim()) {
+      const searchValue = searchTerm.trim()
+      
+      // Check if search term looks like a numeric user ID (all digits)
+      const isNumericId = /^\d+$/.test(searchValue)
+      
+      if (isNumericId) {
+        // Check if chat already exists in the list
+        const existingChat = chats.find(chat => 
+          chat.numericUserId === searchValue || 
+          chat.numericUserId?.toString() === searchValue
+        )
+        
+        if (existingChat) {
+          // Chat exists, just select it
+          setSelectedChat(existingChat)
+          showToast('Chat found!', 'success')
+          return
+        }
+        
+        // Chat doesn't exist, try to find user and create chat
+        setSearchingUser(true)
+        try {
+          const result = await findUserAndCreateChat(searchValue)
+          
+          if (result.success) {
+            // Format the chat to match the expected structure
+            const formattedChat = {
+              id: result.chat.id,
+              username: result.chat.username || result.chat.userName || result.chat.name || 'Unknown User',
+              userId: result.chat.userId || result.chat.id,
+              numericUserId: result.chat.numericUserId || 'N/A',
+              avatar: (result.chat.username || result.chat.userName || 'U').charAt(0).toUpperCase(),
+              lastMessage: result.chat.lastMessage || 'No messages yet',
+              time: result.chat.time || (result.chat.lastMessageTime ? new Date(result.chat.lastMessageTime.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'N/A'),
+              lastMessageTime: result.chat.lastMessageTime,
+              unread: result.chat.unread || 0,
+              status: result.chat.status || 'active',
+              ...result.chat
+            }
+            
+            setSelectedChat(formattedChat)
+            
+            if (result.isNew) {
+              showToast('New chat created! You can now send the first message.', 'success')
+            } else {
+              showToast('Chat found!', 'success')
+            }
+          } else {
+            showToast(result.error || 'User not found', 'error')
+          }
+        } catch (error) {
+          console.error('Error searching user:', error)
+          showToast('Error searching user: ' + error.message, 'error')
+        } finally {
+          setSearchingUser(false)
+        }
+      }
+    }
+  }
+
   // Filter chats
   const filteredChats = chats.filter(chat => {
     const matchesSearch = chat.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -341,55 +409,43 @@ const Chats = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex min-h-[40vh] items-center justify-center">
         <Loader />
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between"
-      >
-        <div>
-          <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-            <div className="w-10 h-10 bg-pink-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(-5deg)' }}>
-              <MessageSquare className="w-6 h-6 text-white" />
-            </div>
-            Chats
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Real-time communication with users and support management
-          </p>
-        </div>
-      </motion.div>
+    <div className="page-shell">
+      <PageHeader title="Chats" description="Support conversations with users." />
 
-      {/* Chat Interface */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="card p-0 overflow-hidden"
-        style={{ height: 'calc(100vh - 280px)' }}
-      >
+      <section className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden" style={{ height: 'calc(100vh - 160px)' }}>
         <div className="flex h-full relative">
           {/* Chat List */}
           <div className="w-80 border-r border-gray-200 dark:border-gray-700 flex flex-col bg-white dark:bg-gray-800">
             {/* Search and Filters */}
             <div className="p-4 border-b border-gray-200 dark:border-gray-700 space-y-3">
+              {/* Unified Search - searches existing chats OR creates new chat */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search users..."
+                  placeholder="Search chats by name or User ID (press Enter for new chat)..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-sm"
+                  onKeyPress={handleSearchKeyPress}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-1 focus:ring-gray-400 bg-white dark:bg-gray-700 text-sm"
+                  disabled={searchingUser}
                 />
+                {searchingUser && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <div className="w-4 h-4 border-2 border-primary-500/30 border-t-primary-500 rounded-full animate-spin" />
+                  </div>
+                )}
               </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 px-1">
+                💡 Tip: Type a User ID and press Enter to start a new chat
+              </p>
               
               {/* Filter Buttons */}
               <div className="flex gap-2 flex-wrap">
@@ -404,7 +460,7 @@ const Chats = () => {
                     onClick={() => setChatFilter(filter.value)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                       chatFilter === filter.value
-                        ? 'bg-primary-500 text-white shadow-md'
+                        ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
                         : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                     }`}
                   >
@@ -435,7 +491,7 @@ const Chats = () => {
                     onClick={() => setSelectedChat(chat)}
                     className={`p-4 border-b border-gray-100 dark:border-gray-800 cursor-pointer transition-all ${
                       selectedChat?.id === chat.id
-                        ? 'bg-primary-50 dark:bg-primary-900/20 border-l-4 border-l-primary-500'
+                        ? 'bg-gray-100 dark:bg-gray-700/60'
                         : 'hover:bg-gray-50 dark:hover:bg-gray-700'
                     }`}
                   >
@@ -455,7 +511,7 @@ const Chats = () => {
                           <p className="font-semibold truncate text-sm">{chat.username}</p>
                           <span className="text-xs text-gray-500 flex-shrink-0 ml-2">{chat.time}</span>
                         </div>
-                        <p className="text-xs text-pink-600 dark:text-pink-400 font-mono font-bold mb-1">
+                        <p className="text-xs text-gray-900 dark:text-gray-100 font-mono font-bold mb-1">
                           ID: {chat.numericUserId}
                         </p>
                         <p className="text-sm text-gray-600 dark:text-gray-400 truncate mb-1">{chat.lastMessage}</p>
@@ -491,7 +547,7 @@ const Chats = () => {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm">{selectedChat.username}</p>
-                      <p className="text-xs text-pink-600 dark:text-pink-400 font-mono font-bold">
+                      <p className="text-xs text-gray-900 dark:text-gray-100 font-mono font-bold">
                         ID: {selectedChat.numericUserId}
                       </p>
                     </div>
@@ -504,7 +560,7 @@ const Chats = () => {
                     >
                       <Info className="w-5 h-5 text-gray-600 dark:text-gray-400" />
                     </button>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                    <span className={`px-2 py-0.5 rounded-md text-[11px] font-medium ${
                       selectedChat.status === 'active' 
                         ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' 
                         : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
@@ -523,10 +579,10 @@ const Chats = () => {
                     <div className="flex items-center justify-center h-full">
                       <div className="text-center">
                         <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-primary-100 to-secondary-100 dark:from-primary-900/30 dark:to-secondary-900/30 rounded-full flex items-center justify-center">
-                          <MessageSquare className="w-10 h-10 text-pink-500" />
+                          <MessageSquare className="w-10 h-10 text-gray-700 dark:text-gray-200" />
                         </div>
                         <p className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-1">No messages yet</p>
-                        <p className="text-sm text-gray-500">Start the conversation by sending a message below</p>
+                        <p className="text-sm text-gray-500">You can start the conversation by sending a message below</p>
                       </div>
                     </div>
                   ) : (
@@ -569,7 +625,7 @@ const Chats = () => {
                                     key={msg.id}
                                     className={`px-4 py-2.5 rounded-2xl shadow-sm ${
                                       msg.sender === 'admin'
-                                        ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-br-sm'
+                                        ? 'bg-gray-900 dark:bg-white dark:text-gray-900 text-white rounded-md'
                                         : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 rounded-bl-sm'
                                     } ${msgIndex === group.messages.length - 1 ? '' : 'mb-1'}`}
                                   >
@@ -595,7 +651,7 @@ const Chats = () => {
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.8 }}
                         onClick={scrollToBottom}
-                        className="absolute bottom-6 right-6 p-3 bg-primary-500 hover:bg-primary-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all z-10"
+                        className="absolute bottom-4 right-4 p-2 bg-gray-900 text-white rounded-md z-10"
                       >
                         <ChevronDown className="w-5 h-5" />
                       </motion.button>
@@ -641,7 +697,7 @@ const Chats = () => {
               <div className="flex items-center justify-center h-full">
                 <div className="text-center max-w-md">
                   <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-primary-100 to-secondary-100 dark:from-primary-900/30 dark:to-secondary-900/30 rounded-full flex items-center justify-center">
-                    <MessageSquare className="w-12 h-12 text-pink-500" />
+                    <MessageSquare className="w-12 h-12 text-gray-700 dark:text-gray-200" />
                   </div>
                   <p className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">No Chat Selected</p>
                   <p className="text-sm text-gray-500 mb-4">Select a conversation from the list to view messages and reply to users</p>
@@ -691,7 +747,7 @@ const Chats = () => {
                             />
                           </div>
                           <p className="font-semibold text-lg">{selectedChat.username}</p>
-                          <p className="text-sm text-pink-600 dark:text-pink-400 font-mono font-bold mt-1">
+                          <p className="text-sm text-gray-900 dark:text-gray-100 font-mono font-bold mt-1">
                             ID: {selectedChat.numericUserId}
                           </p>
                         </div>
@@ -718,7 +774,7 @@ const Chats = () => {
                               <CheckCircle className="w-4 h-4 text-gray-500" />
                               <span className="text-xs font-semibold text-gray-500 uppercase">Status</span>
                             </div>
-                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                            <span className={`inline-block px-2 py-0.5 rounded-md text-[11px] font-medium ${
                               selectedChat.status === 'active'
                                 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
                                 : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
@@ -745,7 +801,7 @@ const Chats = () => {
             </AnimatePresence>
           </div>
         </div>
-      </motion.div>
+      </section>
     </div>
   )
 }

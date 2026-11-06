@@ -1,1252 +1,227 @@
-import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
-import { Users, Ticket, Key, LayoutDashboard, UserCheck, Radio, DollarSign, TrendingUp, TrendingDown, Trophy, X } from 'lucide-react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { useApp } from '../context/AppContext'
-import StatCard from '../components/StatCard'
-import Loader from '../components/Loader'
-import UserAvatar from '../components/UserAvatar'
-import { collection, getDocs, query, where, orderBy, limit, Timestamp, onSnapshot, doc, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore'
+import { useState } from 'react'
+import {
+  Activity,
+  DollarSign,
+  Radio,
+  Shield,
+  UserCheck,
+  Users,
+  Wallet,
+} from 'lucide-react'
+import { doc, serverTimestamp, updateDoc } from 'firebase/firestore'
 import { db } from '../firebase/config'
+import { useApp } from '../context/AppContext'
+import { useDashboardData } from '../hooks/useDashboardData'
+import KpiCard from '../components/KpiCard'
+import Loader from '../components/Loader'
+import ActionCenter from '../components/dashboard/ActionCenter'
+import LiveOps from '../components/dashboard/LiveOps'
+import EconomyPanel from '../components/dashboard/EconomyPanel'
+import SafetyFeed from '../components/dashboard/SafetyFeed'
+import HostsAnalytics from '../components/dashboard/HostsAnalytics'
+import SystemStrip from '../components/dashboard/SystemStrip'
+import { exportToCSV } from '../utils/exportUtils'
+import { formatCompact, timeAgo } from '../utils/dashboardFields'
+
+const DATE_PRESETS = [
+  { id: 'today', label: 'Today' },
+  { id: 'yesterday', label: 'Yesterday' },
+  { id: '7d', label: '7 days' },
+  { id: '30d', label: '30 days' },
+  { id: '90d', label: '90 days' },
+  { id: 'thisMonth', label: 'This month' },
+  { id: 'lastMonth', label: 'Last month' },
+  { id: 'custom', label: 'Custom' },
+]
 
 const Dashboard = () => {
-  const { data, showToast } = useApp()
-  const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState({
-    totalUsers: 0,
-    activeTickets: 0,
-    ongoingChats: 0,
-    approvedHosts: 0,
-    activeUsers: 0 // Currently active users (last 5 minutes)
-  })
-  const [recentActivity, setRecentActivity] = useState([])
-  const [chartData, setChartData] = useState({
-    userActivity: [],
-    revenue: []
-  })
-  const [lastUpdated, setLastUpdated] = useState(null)
-  const [liveStreams, setLiveStreams] = useState([])
+  const { showToast } = useApp()
+  const [preset, setPreset] = useState('7d')
+  const [customStart, setCustomStart] = useState('')
+  const [customEnd, setCustomEnd] = useState('')
+  const [countryFilter, setCountryFilter] = useState('all')
+  const [platformFilter, setPlatformFilter] = useState('all')
+  const [userTypeFilter, setUserTypeFilter] = useState('all')
+  const [fullscreen, setFullscreen] = useState(false)
+  const [detailsOpen, setDetailsOpen] = useState(false)
   const [stoppingStream, setStoppingStream] = useState(null)
-  const [revenueStats, setRevenueStats] = useState({
-    todayRevenue: 0,
-    coinsPurchasedToday: 0,
-    coinsSpentToday: 0,
-    topEarningHost: { name: 'N/A', amount: 0 }
+
+  const { loading, error, health, availability, lastUpdated, liveStreams, metrics } = useDashboardData({
+    preset,
+    customStart,
+    customEnd,
+    countryFilter,
+    platformFilter,
+    userTypeFilter,
   })
 
-  // Fetch real statistics from Firebase
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        setLoading(true)
-
-        // Fetch total users count
-        const usersSnapshot = await getDocs(collection(db, 'users'))
-        const totalUsers = usersSnapshot.size
-
-        // Fetch active tickets count
-        let activeTickets = 0
-        try {
-          // Try supportTickets first (as used in TicketsV2 page)
-          const ticketsQuery = query(
-            collection(db, 'supportTickets'),
-            where('status', 'in', ['open', 'in-progress', 'pending'])
-          )
-          const ticketsSnapshot = await getDocs(ticketsQuery)
-          activeTickets = ticketsSnapshot.size
-        } catch (error) {
-          // Fallback to 'tickets' collection if supportTickets doesn't exist
-          try {
-            const ticketsQuery = query(
-              collection(db, 'tickets'),
-              where('status', 'in', ['open', 'in-progress'])
-            )
-            const ticketsSnapshot = await getDocs(ticketsQuery)
-            activeTickets = ticketsSnapshot.size
-          } catch (fallbackError) {
-            console.log('Tickets collection may not exist yet')
-          }
-        }
-
-        // Fetch ongoing chats count
-        let ongoingChats = 0
-        try {
-          // Use supportChats collection (as used in Chats page)
-          const chatsSnapshot = await getDocs(collection(db, 'supportChats'))
-          ongoingChats = chatsSnapshot.size
-        } catch (error) {
-          // Fallback to 'chats' collection if supportChats doesn't exist
-          try {
-            const chatsSnapshot = await getDocs(collection(db, 'chats'))
-            ongoingChats = chatsSnapshot.size
-          } catch (fallbackError) {
-            console.log('Chats collection may not exist yet')
-          }
-        }
-
-        // Fetch user activity data for last 7 days
-        const userActivityData = []
-        const last7Days = []
-        for (let i = 6; i >= 0; i--) {
-          const date = new Date()
-          date.setDate(date.getDate() - i)
-          last7Days.push({
-            date: new Date(date.setHours(0, 0, 0, 0)),
-            name: date.toLocaleDateString('en-US', { weekday: 'short' })
-          })
-        }
-
-        for (const day of last7Days) {
-          const nextDay = new Date(day.date)
-          nextDay.setDate(nextDay.getDate() + 1)
-          
-          try {
-            const dayStart = Timestamp.fromDate(day.date)
-            const dayEnd = Timestamp.fromDate(nextDay)
-            
-            const usersQuery = query(
-              collection(db, 'users'),
-              where('createdAt', '>=', dayStart),
-              where('createdAt', '<', dayEnd)
-            )
-            const usersSnapshot = await getDocs(usersQuery)
-            const newUsers = usersSnapshot.size
-
-            // Get active users (users who logged in that day) - simplified
-            let activeUsers = 0
-            try {
-              const activeUsersQuery = query(
-                collection(db, 'users'),
-                where('lastActive', '>=', dayStart),
-                where('lastActive', '<', dayEnd)
-              )
-              const activeSnapshot = await getDocs(activeUsersQuery)
-              activeUsers = activeSnapshot.size
-            } catch (error) {
-              // lastActive field might not exist, use new users as proxy
-              activeUsers = Math.floor(newUsers * 0.7) // Estimate 70% active
-            }
-
-            userActivityData.push({
-              name: day.name,
-              users: newUsers,
-              active: activeUsers
-            })
-          } catch (error) {
-            userActivityData.push({
-              name: day.name,
-              users: 0,
-              active: 0
-            })
-          }
-        }
-
-        // Fetch revenue data for last 7 days
-        const revenueData = []
-        for (const day of last7Days) {
-          const nextDay = new Date(day.date)
-          nextDay.setDate(nextDay.getDate() + 1)
-          
-          try {
-            const dayStart = Timestamp.fromDate(day.date)
-            const dayEnd = Timestamp.fromDate(nextDay)
-            
-            let dayRevenue = 0
-            let coinsPurchased = 0
-
-            // Try transactions collection
-            try {
-              const transactionsQuery = query(
-                collection(db, 'transactions'),
-                where('createdAt', '>=', dayStart),
-                where('createdAt', '<', dayEnd)
-              )
-              const transactionsSnapshot = await getDocs(transactionsQuery)
-              
-              transactionsSnapshot.forEach(doc => {
-                const data = doc.data()
-                const type = (data.type || '').toLowerCase()
-                const amount = Number(data.amount) || 0
-                const value = Number(data.value) || Number(data.amount) || 0
-
-                if (type === 'purchase' || type === 'credit') {
-                  dayRevenue += value
-                  coinsPurchased += amount
-                }
-              })
-            } catch (error) {
-              console.log('transactions collection error for day:', error)
-            }
-
-            // Try coin_transactions collection
-            try {
-              const coinTransactionsQuery = query(
-                collection(db, 'coin_transactions'),
-                where('createdAt', '>=', dayStart),
-                where('createdAt', '<', dayEnd)
-              )
-              const coinTransactionsSnapshot = await getDocs(coinTransactionsQuery)
-              
-              coinTransactionsSnapshot.forEach(doc => {
-                const data = doc.data()
-                const type = (data.type || '').toLowerCase()
-                const amount = Number(data.amount) || 0
-                const value = Number(data.value) || Number(data.amount) || 0
-
-                if (type === 'purchase' || type === 'credit') {
-                  dayRevenue += value
-                  coinsPurchased += amount
-                }
-              })
-            } catch (error) {
-              console.log('coin_transactions collection error for day:', error)
-            }
-
-            revenueData.push({
-              name: day.name,
-              revenue: Math.round(dayRevenue),
-              coins: coinsPurchased
-            })
-          } catch (error) {
-            revenueData.push({
-              name: day.name,
-              revenue: 0,
-              coins: 0
-            })
-          }
-        }
-
-        // Fetch recent users as activity
-        let recentUsersSnapshot
-        try {
-          // Try to order by createdAt first
-          const recentUsersQuery = query(
-            collection(db, 'users'),
-            orderBy('createdAt', 'desc'),
-            limit(10)
-          )
-          recentUsersSnapshot = await getDocs(recentUsersQuery)
-        } catch (error) {
-          // If createdAt index doesn't exist, fetch all users and sort manually
-          console.log('createdAt index not available, fetching all users:', error)
-          const allUsersSnapshot = await getDocs(collection(db, 'users'))
-          const allUsers = allUsersSnapshot.docs
-            .map(doc => ({ id: doc.id, data: doc.data(), doc }))
-            .filter(item => item.data.createdAt) // Only include users with createdAt
-            .sort((a, b) => {
-              try {
-                const aTime = a.data.createdAt?.toDate ? a.data.createdAt.toDate() : new Date(a.data.createdAt)
-                const bTime = b.data.createdAt?.toDate ? b.data.createdAt.toDate() : new Date(b.data.createdAt)
-                return bTime - aTime
-              } catch (e) {
-                return 0
-              }
-            })
-            .slice(0, 10)
-          
-          // Create a mock snapshot-like object
-          recentUsersSnapshot = {
-            docs: allUsers.map(item => item.doc)
-          }
-        }
-        const activities = recentUsersSnapshot.docs.map(doc => {
-          const userData = doc.data()
-          
-          // Get user name - match the same logic as Users page
-          const userName = userData.name || userData.displayName || userData.userName || userData.email || 'Unknown User'
-          
-          // Get numeric user ID
-          const numericUserId = userData.numericUserId || userData.numeric_user_id || userData.userNumericId || 'N/A'
-          
-          // Get phone number - check multiple field names
-          const phone = userData.phone || userData.phoneNumber || userData.userPhone || userData.user_phone || userData.mobile || userData.mobileNumber || null
-          
-          // Get timestamp - handle both Timestamp and Date objects
-          let timestamp = 'Recently'
-          if (userData.createdAt) {
-            try {
-              if (userData.createdAt.toDate) {
-                timestamp = new Date(userData.createdAt.toDate()).toLocaleString()
-              } else if (userData.createdAt instanceof Date) {
-                timestamp = userData.createdAt.toLocaleString()
-              } else {
-                timestamp = new Date(userData.createdAt).toLocaleString()
-              }
-            } catch (e) {
-              console.warn('Date parse error for createdAt:', e)
-            }
-          }
-          
-          return {
-            id: doc.id,
-            user: userName,
-            numericUserId: numericUserId,
-            phone: phone,
-            action: 'New user registered',
-            type: 'login',
-            time: timestamp
-          }
-        })
-
-        setStats(prevStats => ({
-          totalUsers,
-          activeTickets,
-          ongoingChats,
-          approvedHosts: prevStats.approvedHosts || 0, // Keep existing value, will be updated by real-time listener
-          activeUsers: prevStats.activeUsers || 0 // Keep existing value, will be updated by real-time listener
-        }))
-        setRecentActivity(activities)
-        setChartData({
-          userActivity: userActivityData.length > 0 ? userActivityData : [
-            { name: 'Mon', users: 0, active: 0 },
-            { name: 'Tue', users: 0, active: 0 },
-            { name: 'Wed', users: 0, active: 0 },
-            { name: 'Thu', users: 0, active: 0 },
-            { name: 'Fri', users: 0, active: 0 },
-            { name: 'Sat', users: 0, active: 0 },
-            { name: 'Sun', users: 0, active: 0 }
-          ],
-          revenue: revenueData.length > 0 ? revenueData : [
-            { name: 'Mon', revenue: 0, coins: 0 },
-            { name: 'Tue', revenue: 0, coins: 0 },
-            { name: 'Wed', revenue: 0, coins: 0 },
-            { name: 'Thu', revenue: 0, coins: 0 },
-            { name: 'Fri', revenue: 0, coins: 0 },
-            { name: 'Sat', revenue: 0, coins: 0 },
-            { name: 'Sun', revenue: 0, coins: 0 }
-          ]
-        })
-        setLastUpdated(new Date())
-        setLoading(false)
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error)
-        showToast('Error loading dashboard data', 'error')
-        setLoading(false)
-      }
-    }
-
-    fetchDashboardData()
-  }, [])
-
-  // Real-time listener for recent activity (new user registrations)
-  useEffect(() => {
-    let unsubscribe = null
-    let isMounted = true
-    
-    try {
-      const usersCollection = collection(db, 'users')
-      
-      unsubscribe = onSnapshot(
-        usersCollection,
-        (snapshot) => {
-          if (!isMounted) return
-          
-          try {
-            // Get recent users (last 10)
-            const allUsers = []
-            snapshot.forEach((doc) => {
-              const userData = doc.data()
-              if (userData.createdAt) {
-                allUsers.push({
-                  id: doc.id,
-                  data: userData,
-                  createdAt: userData.createdAt?.toDate ? userData.createdAt.toDate() : new Date(userData.createdAt)
-                })
-              }
-            })
-            
-            // Sort by createdAt descending (newest first) and take top 10
-            allUsers.sort((a, b) => {
-              try {
-                const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt).getTime()
-                const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt).getTime()
-                return bTime - aTime // Descending order (newest first)
-              } catch (e) {
-                return 0 // Keep original order if date parsing fails
-              }
-            })
-            const recentUsers = allUsers.slice(0, 10)
-            
-            // Map to activity format
-            const activities = recentUsers.map(item => {
-              const userData = item.data
-              
-              // Get user name - match the same logic as Users page
-              const userName = userData.name || userData.displayName || userData.userName || userData.email || 'Unknown User'
-              
-              // Get numeric user ID
-              const numericUserId = userData.numericUserId || userData.numeric_user_id || userData.userNumericId || 'N/A'
-              
-              // Get phone number - check multiple field names (match initial load logic)
-              const phone = userData.phone || userData.phoneNumber || userData.userPhone || userData.user_phone || userData.mobile || userData.mobileNumber || null
-              
-              // Get timestamp - handle both Timestamp and Date objects (match initial load logic)
-              let timestamp = 'Recently'
-              try {
-                timestamp = item.createdAt.toLocaleString()
-              } catch (e) {
-                console.warn('Date parse error:', e)
-              }
-              
-              return {
-                id: item.id,
-                user: userName,
-                numericUserId: numericUserId,
-                phone: phone,
-                action: 'New user registered',
-                type: 'login',
-                time: timestamp
-              }
-            })
-            
-            setRecentActivity(activities)
-            setLastUpdated(new Date())
-          } catch (error) {
-            console.error('Error processing recent activity:', error)
-          }
-        },
-        (error) => {
-          console.error('Error listening to recent activity:', error)
-        }
-      )
-    } catch (error) {
-      console.error('Error setting up recent activity listener:', error)
-    }
-
-    return () => {
-      isMounted = false
-      if (unsubscribe) {
-        unsubscribe()
-      }
-    }
-  }, [])
-
-  // Real-time listener for approved hosts count
-  useEffect(() => {
-    let unsubscribe = null
-    let isMounted = true
-    
-    try {
-      const usersCollection = collection(db, 'users')
-      
-      unsubscribe = onSnapshot(
-        usersCollection,
-        (snapshot) => {
-          if (!isMounted) return
-          
-          let approvedCount = 0
-          let activeUsersCount = 0
-          const now = new Date()
-          const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000) // 5 minutes ago
-          
-          snapshot.forEach(doc => {
-            const userData = doc.data()
-            
-            // Count users who are approved for live streaming (isActive === true)
-            // This matches the "Live Approved" count in Users page
-            if (userData.isActive === true) {
-              approvedCount++
-            }
-            
-            // Count currently active users (lastActive within last 5 minutes)
-            if (userData.lastActive) {
-              try {
-                const lastActiveDate = userData.lastActive.toDate ? userData.lastActive.toDate() : new Date(userData.lastActive)
-                if (!isNaN(lastActiveDate.getTime()) && lastActiveDate >= fiveMinutesAgo) {
-                  activeUsersCount++
-                }
-              } catch (e) {
-                // Ignore date parsing errors
-              }
-            }
-          })
-          
-          setStats(prevStats => ({
-            ...prevStats,
-            totalUsers: snapshot.size, // Update total users count in real-time
-            approvedHosts: approvedCount,
-            activeUsers: activeUsersCount
-          }))
-        },
-        (error) => {
-          console.error('Error listening to users count:', error)
-          if (isMounted) {
-            setStats(prevStats => ({
-              ...prevStats,
-              totalUsers: prevStats.totalUsers || 0, // Keep existing count on error
-              approvedHosts: 0,
-              activeUsers: 0
-            }))
-          }
-        }
-      )
-    } catch (error) {
-      console.error('Error setting up approved hosts listener:', error)
-    }
-
-    return () => {
-      isMounted = false
-      if (unsubscribe) {
-        unsubscribe()
-      }
-    }
-  }, [])
-
-  // Real-time listener for live streams
-  useEffect(() => {
-    let unsubscribe = null
-    let isMounted = true
-
-    const fetchLiveStreams = async () => {
-      try {
-        const streams = []
-
-        // Method 1: Check live_streams collection
-        try {
-          const liveStreamsQuery = query(
-            collection(db, 'live_streams'),
-            where('status', '==', 'live')
-          )
-          const liveStreamsSnapshot = await getDocs(liveStreamsQuery)
-          liveStreamsSnapshot.forEach(doc => {
-            const data = doc.data()
-            const startTime = data.startTime || data.start_time || data.createdAt
-            const startDate = startTime?.toDate ? startTime.toDate() : (startTime ? new Date(startTime) : new Date())
-            
-            streams.push({
-              id: doc.id,
-              hostId: data.hostId || data.host_id || data.userId || '',
-              hostName: data.hostName || data.host_name || data.userName || data.name || 'Unknown Host',
-              numericUserId: data.numericUserId || data.numeric_user_id || 'N/A',
-              viewCount: data.viewCount || data.view_count || data.viewers || 0,
-              startTime: startDate,
-              coinsPerMinute: data.coinsPerMinute || data.coins_per_minute || data.coinsPerMin || 0,
-              totalCoinsEarned: data.totalCoinsEarned || data.total_coins_earned || 0,
-              collection: 'live_streams'
-            })
-          })
-        } catch (error) {
-          console.log('live_streams collection not found or error:', error)
-        }
-
-        // Method 2: Check users collection for isLive === true
-        try {
-          const usersQuery = query(
-            collection(db, 'users'),
-            where('isLive', '==', true)
-          )
-          const usersSnapshot = await getDocs(usersQuery)
-          usersSnapshot.forEach(doc => {
-            const data = doc.data()
-            const liveData = data.liveStreamData || data.live_stream_data || {}
-            const startTime = liveData.startTime || liveData.start_time || data.liveStartTime || data.live_start_time
-            const startDate = startTime?.toDate ? startTime.toDate() : (startTime ? new Date(startTime) : new Date())
-            
-            // Only add if not already in streams (avoid duplicates)
-            if (!streams.find(s => s.hostId === doc.id)) {
-              streams.push({
-                id: doc.id,
-                hostId: doc.id,
-                hostName: data.name || data.displayName || data.userName || 'Unknown Host',
-                numericUserId: data.numericUserId || data.numeric_user_id || 'N/A',
-                viewCount: liveData.viewCount || liveData.view_count || liveData.viewers || 0,
-                startTime: startDate,
-                coinsPerMinute: liveData.coinsPerMinute || liveData.coins_per_minute || 0,
-                totalCoinsEarned: liveData.totalCoinsEarned || liveData.total_coins_earned || 0,
-                collection: 'users'
-              })
-            }
-          })
-        } catch (error) {
-          console.log('Error checking users for isLive:', error)
-        }
-
-        // Method 3: Check active_streams collection
-        try {
-          const activeStreamsQuery = query(
-            collection(db, 'active_streams'),
-            where('status', '==', 'live')
-          )
-          const activeStreamsSnapshot = await getDocs(activeStreamsQuery)
-          activeStreamsSnapshot.forEach(doc => {
-            const data = doc.data()
-            const startTime = data.startTime || data.start_time || data.createdAt
-            const startDate = startTime?.toDate ? startTime.toDate() : (startTime ? new Date(startTime) : new Date())
-            
-            if (!streams.find(s => s.id === doc.id)) {
-              streams.push({
-                id: doc.id,
-                hostId: data.hostId || data.host_id || data.userId || '',
-                hostName: data.hostName || data.host_name || data.userName || data.name || 'Unknown Host',
-                numericUserId: data.numericUserId || data.numeric_user_id || 'N/A',
-                viewCount: data.viewCount || data.view_count || data.viewers || 0,
-                startTime: startDate,
-                coinsPerMinute: data.coinsPerMinute || data.coins_per_minute || data.coinsPerMin || 0,
-                totalCoinsEarned: data.totalCoinsEarned || data.total_coins_earned || 0,
-                collection: 'active_streams'
-              })
-            }
-          })
-        } catch (error) {
-          console.log('active_streams collection not found or error:', error)
-        }
-
-        if (isMounted) {
-          setLiveStreams(streams)
-        }
-      } catch (error) {
-        console.error('Error fetching live streams:', error)
-        if (isMounted) {
-          setLiveStreams([])
-        }
-      }
-    }
-
-    // Initial fetch
-    fetchLiveStreams()
-
-    // Set up real-time listener on users collection (for isLive changes)
-    try {
-      unsubscribe = onSnapshot(
-        collection(db, 'users'),
-        () => {
-          fetchLiveStreams()
-        },
-        (error) => {
-          console.error('Error listening to live streams:', error)
-        }
-      )
-    } catch (error) {
-      console.error('Error setting up live streams listener:', error)
-    }
-
-    // Refresh every 10 seconds for view count updates
-    const interval = setInterval(fetchLiveStreams, 10000)
-
-    return () => {
-      isMounted = false
-      if (unsubscribe) {
-        unsubscribe()
-      }
-      clearInterval(interval)
-    }
-  }, [])
-
-  // Calculate stream duration helper
-  const calculateStreamDuration = (startTime) => {
-    if (!startTime) return '0 min'
-    const now = new Date()
-    const start = startTime instanceof Date ? startTime : new Date(startTime)
-    const diffMs = now - start
-    const diffMins = Math.floor(diffMs / 60000)
-    if (diffMins < 1) return 'Just started'
-    if (diffMins < 60) return `${diffMins} min`
-    const hours = Math.floor(diffMins / 60)
-    const mins = diffMins % 60
-    return `${hours}h ${mins}min`
-  }
-
-  // Force stop stream function
   const handleStopStream = async (stream) => {
     setStoppingStream(stream.id)
     try {
       if (stream.collection === 'users') {
-        // Update user document
-        const userRef = doc(db, 'users', stream.hostId)
-        await updateDoc(userRef, {
+        await updateDoc(doc(db, 'users', stream.hostId), {
           isLive: false,
           liveStreamData: null,
           liveEndedAt: serverTimestamp(),
-          liveEndedBy: 'admin'
+          liveEndedBy: 'admin',
         })
       } else {
-        // Update stream document
-        const streamRef = doc(db, stream.collection, stream.id)
-        await updateDoc(streamRef, {
+        await updateDoc(doc(db, stream.collection, stream.id), {
           status: 'ended',
           endedAt: serverTimestamp(),
-          endedBy: 'admin'
+          endedBy: 'admin',
         })
-        
-        // Also update user if hostId exists
         if (stream.hostId) {
           try {
-            const userRef = doc(db, 'users', stream.hostId)
-            await updateDoc(userRef, {
+            await updateDoc(doc(db, 'users', stream.hostId), {
               isLive: false,
-              liveStreamData: null
+              liveStreamData: null,
             })
-          } catch (e) {
-            console.log('Could not update user document:', e)
+          } catch {
+            // host doc may not exist
           }
         }
       }
-      
-      showToast('Stream stopped successfully', 'success')
-    } catch (error) {
-      console.error('Error stopping stream:', error)
-      showToast('Error stopping stream', 'error')
+      showToast('Stream stopped', 'success')
+    } catch (err) {
+      showToast(err.message || 'Could not stop stream', 'error')
     }
     setStoppingStream(null)
   }
 
-  // Fetch revenue analytics
-  useEffect(() => {
-    const fetchRevenueData = async () => {
-      try {
-        const now = new Date()
-        const todayStart = new Date(now.setHours(0, 0, 0, 0))
-        const todayEnd = new Date(now.setHours(23, 59, 59, 999))
-        const todayStartTs = Timestamp.fromDate(todayStart)
-        const todayEndTs = Timestamp.fromDate(todayEnd)
-
-        let todayRevenue = 0
-        let coinsPurchasedToday = 0
-        let coinsSpentToday = 0
-        const hostEarnings = {}
-
-        // Try transactions collection
-        try {
-          const transactionsQuery = query(
-            collection(db, 'transactions'),
-            where('createdAt', '>=', todayStartTs),
-            where('createdAt', '<=', todayEndTs)
-          )
-          const transactionsSnapshot = await getDocs(transactionsQuery)
-          
-          transactionsSnapshot.forEach(doc => {
-            const data = doc.data()
-            const type = (data.type || '').toLowerCase()
-            const amount = Number(data.amount) || 0
-            const value = Number(data.value) || Number(data.amount) || 0
-
-            if (type === 'purchase' || type === 'credit') {
-              todayRevenue += value
-              coinsPurchasedToday += amount
-            } else if (type === 'spend' || type === 'debit') {
-              coinsSpentToday += amount
-            } else if (type === 'earn' || type === 'earning') {
-              const hostId = data.hostId || data.host_id || data.userId || ''
-              if (hostId) {
-                hostEarnings[hostId] = (hostEarnings[hostId] || 0) + amount
-              }
-            }
-          })
-        } catch (error) {
-          console.log('transactions collection not found or error:', error)
-        }
-
-        // Try coin_transactions collection
-        try {
-          const coinTransactionsQuery = query(
-            collection(db, 'coin_transactions'),
-            where('createdAt', '>=', todayStartTs),
-            where('createdAt', '<=', todayEndTs)
-          )
-          const coinTransactionsSnapshot = await getDocs(coinTransactionsQuery)
-          
-          coinTransactionsSnapshot.forEach(doc => {
-            const data = doc.data()
-            const type = (data.type || '').toLowerCase()
-            const amount = Number(data.amount) || 0
-            const value = Number(data.value) || Number(data.amount) || 0
-
-            if (type === 'purchase' || type === 'credit') {
-              todayRevenue += value
-              coinsPurchasedToday += amount
-            } else if (type === 'spend' || type === 'debit') {
-              coinsSpentToday += amount
-            } else if (type === 'earn' || type === 'earning') {
-              const hostId = data.hostId || data.host_id || data.userId || ''
-              if (hostId) {
-                hostEarnings[hostId] = (hostEarnings[hostId] || 0) + amount
-              }
-            }
-          })
-        } catch (error) {
-          console.log('coin_transactions collection not found or error:', error)
-        }
-
-        // Get top earning host
-        let topHost = { name: 'N/A', amount: 0 }
-        if (Object.keys(hostEarnings).length > 0) {
-          const topHostId = Object.keys(hostEarnings).reduce((a, b) => 
-            hostEarnings[a] > hostEarnings[b] ? a : b
-          )
-          try {
-            // Fetch user document directly
-            const { getDoc } = await import('firebase/firestore')
-            const hostRef = doc(db, 'users', topHostId)
-            const hostSnap = await getDoc(hostRef)
-            if (hostSnap.exists()) {
-              const hostData = hostSnap.data()
-              topHost = {
-                name: hostData.name || hostData.displayName || hostData.userName || 'Unknown',
-                amount: hostEarnings[topHostId]
-              }
-            }
-          } catch (e) {
-            console.log('Could not fetch top host data:', e)
-          }
-        }
-
-        setRevenueStats({
-          todayRevenue,
-          coinsPurchasedToday,
-          coinsSpentToday,
-          topEarningHost: topHost
-        })
-      } catch (error) {
-        console.error('Error fetching revenue data:', error)
-      }
-    }
-
-    fetchRevenueData()
-    // Refresh every 5 minutes
-    const interval = setInterval(fetchRevenueData, 5 * 60 * 1000)
-    return () => clearInterval(interval)
-  }, [])
-
-  // Helper function to get time ago
-  const getTimeAgo = (date) => {
-    if (!date) return 'Just now'
-    const seconds = Math.floor((new Date() - new Date(date)) / 1000)
-    if (seconds < 60) return 'Just now'
-    if (seconds < 3600) return `${Math.floor(seconds / 60)} mins ago`
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`
-    return `${Math.floor(seconds / 86400)} days ago`
+  const exportReport = () => {
+    exportToCSV(
+      [
+        {
+          totalUsers: metrics.totalUsers,
+          dau: metrics.activeUsers,
+          mau: metrics.mauUsers,
+          online: metrics.onlineUsers,
+          liveRooms: metrics.liveRooms,
+          liveViewers: metrics.liveViewers,
+          revenueInRange: metrics.revenueInRange,
+          pendingWithdrawals: metrics.pendingWithdrawals,
+          pendingReports: metrics.pendingReports,
+          pendingHosts: metrics.pendingHostApps,
+        },
+      ],
+      'dashboard-overview'
+    )
   }
-
-  const statCards = [
-    {
-      title: 'Total Users',
-      value: stats.totalUsers.toLocaleString(),
-      icon: Users,
-      color: 'primary',
-      trend: { positive: true, value: `${stats.totalUsers}`, label: 'registered users' },
-    },
-    {
-      title: 'Active Users',
-      value: (stats.activeUsers || 0).toLocaleString(),
-      icon: UserCheck,
-      color: 'secondary',
-      trend: { positive: true, value: `${stats.activeUsers || 0}`, label: 'currently using app' },
-    },
-    {
-      title: 'Active Tickets',
-      value: stats.activeTickets,
-      icon: Ticket,
-      color: 'orange',
-      trend: { positive: false, value: `${stats.activeTickets}`, label: 'need attention' },
-    },
-    {
-      title: 'Approved Hosts',
-      value: stats.approvedHosts,
-      icon: Key,
-      color: 'purple',
-      trend: { positive: true, value: `${stats.approvedHosts}`, label: 'approved hosts' },
-    },
-  ]
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex min-h-[50vh] items-center justify-center">
         <Loader />
       </div>
     )
   }
 
   return (
-    <div className="space-y-8 relative -mt-6">
-      {/* 2D Decorative Background Elements */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-5">
-        <div className="absolute top-20 right-20 w-64 h-64 bg-pink-300 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-20 left-20 w-48 h-48 bg-pink-400 rounded-full blur-2xl"></div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-pink-200 rounded-full blur-3xl"></div>
-      </div>
-
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex items-center gap-8 relative z-10"
-      >
-        <div className="flex-1">
-          <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-            <div className="w-10 h-10 bg-pink-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(-5deg)' }}>
-              <LayoutDashboard className="w-6 h-6 text-white" />
-            </div>
-            Dashboard
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">Overview of your admin panel and key metrics</p>
-        </div>
-        <div className="text-right flex-shrink-0">
-          <p className="text-sm text-gray-600 dark:text-gray-400">Last updated</p>
-          <p className="text-sm font-medium text-pink-600 dark:text-pink-400">
-            {lastUpdated ? getTimeAgo(lastUpdated) : 'Just now'}
+    <div className={`space-y-4 ${fullscreen ? 'fixed inset-0 z-40 overflow-auto bg-gray-50 p-4 dark:bg-gray-900' : ''}`}>
+      <header className="flex flex-col justify-between gap-3 xl:flex-row xl:items-end">
+        <div>
+          <h1 className="text-lg font-semibold tracking-tight text-gray-900 dark:text-white">Operations command center</h1>
+          <p className="text-xs text-gray-500">
+            Decisions first. Metrics only from connected collections.
+            {lastUpdated ? ` Updated ${timeAgo(lastUpdated)}.` : ''}
+            {health.mock ? ' Local demo store — not production Firebase.' : ''}
           </p>
         </div>
-      </motion.div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
-        {statCards.map((card, index) => (
-          <StatCard key={index} {...card} delay={index * 0.1} />
-        ))}
-      </div>
-
-      {/* Live Streaming Panel */}
-      {liveStreams.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-red-500 dark:border-red-600 relative z-10"
-          style={{ boxShadow: 'none' }}
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold flex items-center gap-2">
-              <span className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
-              LIVE HOSTS ({liveStreams.length})
-            </h2>
-          </div>
-          <div className="space-y-3">
-            {liveStreams.map((stream) => (
-              <div
-                key={stream.id}
-                className="flex items-center justify-between p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800"
-              >
-                <div className="flex-1">
-                  <p className="font-semibold text-lg">{stream.hostName}</p>
-                  <div className="flex flex-wrap gap-4 text-sm text-gray-600 dark:text-gray-400 mt-2">
-                    <span className="flex items-center gap-1">
-                      👁️ <span className="font-medium">{stream.viewCount}</span> viewers
-                    </span>
-                    <span className="flex items-center gap-1">
-                      ⏱️ <span className="font-medium">{calculateStreamDuration(stream.startTime)}</span>
-                    </span>
-                    <span className="flex items-center gap-1">
-                      🪙 <span className="font-medium">{stream.coinsPerMinute}</span> coins/min
-                    </span>
-                    {stream.numericUserId && stream.numericUserId !== 'N/A' && (
-                      <span className="text-xs font-mono text-pink-600 dark:text-pink-400 bg-pink-50 dark:bg-pink-900/20 px-2 py-0.5 rounded">
-                        ID: {stream.numericUserId}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleStopStream(stream)}
-                  disabled={stoppingStream === stream.id}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                >
-                  {stoppingStream === stream.id ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Stopping...
-                    </>
-                  ) : (
-                    <>
-                      <X className="w-4 h-4" />
-                      Stop Stream
-                    </>
-                  )}
-                </button>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      )}
-
-      {/* Revenue Analytics Cards */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.25 }}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
-      >
-        <StatCard
-          title="Today's Revenue"
-          value={`₹${revenueStats.todayRevenue.toLocaleString()}`}
-          icon={DollarSign}
-          color="green"
-          trend={{ positive: true, value: "Today", label: "total revenue" }}
-        />
-        <StatCard
-          title="Coins Purchased"
-          value={revenueStats.coinsPurchasedToday.toLocaleString()}
-          icon={TrendingUp}
-          color="teal"
-          trend={{ positive: true, value: "Today", label: "coins bought" }}
-        />
-        <StatCard
-          title="Coins Spent"
-          value={revenueStats.coinsSpentToday.toLocaleString()}
-          icon={TrendingDown}
-          color="red"
-          trend={{ positive: false, value: "Today", label: "coins used" }}
-        />
-        <StatCard
-          title="Top Earning Host"
-          value={revenueStats.topEarningHost.name}
-          icon={Trophy}
-          color="indigo"
-          trend={{ positive: true, value: `₹${revenueStats.topEarningHost.amount.toLocaleString()}`, label: "today" }}
-        />
-      </motion.div>
-
-      {/* Charts */}
-      <div className="grid grid-cols-1 gap-6">
-        {/* User Activity Chart */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 relative z-10"
-          style={{ boxShadow: 'none' }}
-        >
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <div className="w-1 h-6 bg-pink-500 rounded-full"></div>
-            User Activity (Last 7 Days)
-          </h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={chartData.userActivity}>
-              <defs>
-                {/* Green gradient for users line */}
-                <linearGradient id="greenGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#22c55e" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="#22c55e" stopOpacity={0.05} />
-                </linearGradient>
-                {/* Yellow gradient for active line */}
-                <linearGradient id="yellowGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#eab308" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="#eab308" stopOpacity={0.05} />
-                </linearGradient>
-                {/* 3D shadow effect */}
-                <filter id="shadow3d">
-                  <feDropShadow dx="2" dy="2" stdDeviation="3" floodOpacity="0.3"/>
-                </filter>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" strokeWidth={1} />
-              <XAxis 
-                dataKey="name" 
-                stroke="#6b7280" 
-                tick={{ fill: '#6b7280', fontSize: 12, fontWeight: 500 }}
-                axisLine={{ stroke: '#d1d5db', strokeWidth: 2 }}
-              />
-              <YAxis 
-                stroke="#6b7280" 
-                tick={{ fill: '#6b7280', fontSize: 12, fontWeight: 500 }}
-                axisLine={{ stroke: '#d1d5db', strokeWidth: 2 }}
-              />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: '#fff', 
-                  border: '2px solid #e5e7eb',
-                  borderRadius: '12px',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                  padding: '12px'
-                }} 
-              />
-              <Legend 
-                wrapperStyle={{ paddingTop: '20px' }}
-                iconType="line"
-              />
-              <Line 
-                type="monotone" 
-                dataKey="users" 
-                stroke="#22c55e" 
-                strokeWidth={2} 
-                dot={{ fill: '#22c55e', r: 5, strokeWidth: 2, stroke: '#fff', filter: 'url(#shadow3d)' }} 
-                activeDot={{ r: 7, stroke: '#22c55e', strokeWidth: 2 }}
-                fill="url(#greenGradient)"
-              />
-              <Line 
-                type="monotone" 
-                dataKey="active" 
-                stroke="#eab308" 
-                strokeWidth={2} 
-                dot={{ fill: '#eab308', r: 5, strokeWidth: 2, stroke: '#fff', filter: 'url(#shadow3d)' }} 
-                activeDot={{ r: 7, stroke: '#eab308', strokeWidth: 2 }}
-                fill="url(#yellowGradient)"
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </motion.div>
-
-        {/* Revenue Chart */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 relative z-10"
-          style={{ boxShadow: 'none' }}
-        >
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <div className="w-1 h-6 bg-pink-500 rounded-full"></div>
-            Revenue & Coins Analytics (Last 7 Days)
-          </h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={chartData.revenue}>
-              <defs>
-                {/* Green gradient for revenue line */}
-                <linearGradient id="revenueGreenGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#22c55e" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="#22c55e" stopOpacity={0.05} />
-                </linearGradient>
-                {/* Yellow gradient for coins line */}
-                <linearGradient id="coinsYellowGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#eab308" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="#eab308" stopOpacity={0.05} />
-                </linearGradient>
-                {/* 3D shadow effect */}
-                <filter id="revenueShadow3d">
-                  <feDropShadow dx="2" dy="2" stdDeviation="3" floodOpacity="0.3"/>
-                </filter>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" strokeWidth={1} />
-              <XAxis 
-                dataKey="name" 
-                stroke="#6b7280" 
-                tick={{ fill: '#6b7280', fontSize: 12, fontWeight: 500 }}
-                axisLine={{ stroke: '#d1d5db', strokeWidth: 2 }}
-              />
-              <YAxis 
-                stroke="#6b7280" 
-                tick={{ fill: '#6b7280', fontSize: 12, fontWeight: 500 }}
-                axisLine={{ stroke: '#d1d5db', strokeWidth: 2 }}
-                yAxisId="left"
-              />
-              <YAxis 
-                stroke="#6b7280" 
-                tick={{ fill: '#6b7280', fontSize: 12, fontWeight: 500 }}
-                axisLine={{ stroke: '#d1d5db', strokeWidth: 2 }}
-                yAxisId="right"
-                orientation="right"
-              />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: '#fff', 
-                  border: '2px solid #e5e7eb',
-                  borderRadius: '12px',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                  padding: '12px'
-                }}
-                formatter={(value, name) => {
-                  if (name === 'revenue') {
-                    return [`₹${value.toLocaleString()}`, 'Revenue']
-                  }
-                  return [value.toLocaleString(), 'Coins Purchased']
-                }}
-              />
-              <Legend 
-                wrapperStyle={{ paddingTop: '20px' }}
-                iconType="line"
-              />
-              <Line 
-                type="monotone" 
-                dataKey="revenue" 
-                stroke="#22c55e" 
-                strokeWidth={2} 
-                dot={{ fill: '#22c55e', r: 5, strokeWidth: 2, stroke: '#fff', filter: 'url(#revenueShadow3d)' }} 
-                activeDot={{ r: 7, stroke: '#22c55e', strokeWidth: 2 }}
-                fill="url(#revenueGreenGradient)"
-                yAxisId="left"
-              />
-              <Line 
-                type="monotone" 
-                dataKey="coins" 
-                stroke="#eab308" 
-                strokeWidth={2} 
-                dot={{ fill: '#eab308', r: 5, strokeWidth: 2, stroke: '#fff', filter: 'url(#revenueShadow3d)' }} 
-                activeDot={{ r: 7, stroke: '#eab308', strokeWidth: 2 }}
-                fill="url(#coinsYellowGradient)"
-                yAxisId="right"
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </motion.div>
-      </div>
-
-      {/* Recent Activity */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
-        className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 relative z-10"
-        style={{ boxShadow: 'none' }}
-      >
-        <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-          <div className="w-1 h-6 bg-primary-500 rounded-full"></div>
-          Recent Activity
-        </h2>
-        <div className="space-y-3">
-          {recentActivity.length === 0 ? (
-            <p className="text-center text-gray-500 py-8">No recent activity yet</p>
-          ) : (
-            recentActivity.map((activity, index) => (
-            <motion.div
-              key={activity.id}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.5 + index * 0.05 }}
-              className="flex items-center gap-4 p-3 hover:bg-pink-50 dark:hover:bg-pink-900/10 rounded-xl transition-colors border border-transparent hover:border-pink-200 dark:hover:border-pink-800"
-            >
-              {/* Show user avatar for login/new user activities, emoji for others */}
-              {activity.type === 'login' ? (
-                <UserAvatar 
-                  userId={activity.id || activity.numericUserId || activity.user} 
-                  name={activity.user} 
-                  size="md"
-                />
-              ) : (
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl ${
-                  activity.type === 'purchase' ? 'bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400' :
-                  activity.type === 'withdrawal' ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' :
-                  activity.type === 'ticket' ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' :
-                  activity.type === 'security' ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' :
-                  'bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400'
-                }`} style={{ transform: 'rotate(-3deg)' }}>
-                  {activity.type === 'purchase' && '💰'}
-                  {activity.type === 'withdrawal' && '💸'}
-                  {activity.type === 'ticket' && '🎫'}
-                  {activity.type === 'security' && '🚫'}
-                  {activity.type === 'referral' && '👥'}
-                  {activity.type === 'update' && '✏️'}
-                </div>
-              )}
-              <div className="flex-1">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <p className="font-medium text-gray-900 dark:text-gray-100">{activity.user}</p>
-                  {activity.phone && (
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                      Ph: {activity.phone}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 mt-1 flex-wrap">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{activity.action}</p>
-                  {activity.numericUserId && activity.numericUserId !== 'N/A' && (
-                    <span className="text-xs font-mono font-bold text-pink-600 dark:text-pink-400 bg-pink-50 dark:bg-pink-900/20 px-2 py-0.5 rounded">
-                      ID: {activity.numericUserId}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="text-sm text-gray-500">{activity.time}</div>
-            </motion.div>
-            ))
-          )}
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={exportReport} className="btn-secondary">
+            Export CSV
+          </button>
+          <button type="button" onClick={() => setFullscreen((value) => !value)} className="btn-secondary">
+            {fullscreen ? 'Exit full screen' : 'Full screen'}
+          </button>
         </div>
-      </motion.div>
+      </header>
+
+      <div className="filter-bar">
+        {DATE_PRESETS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => setPreset(item.id)}
+            className={`rounded-md px-2.5 py-1 text-xs font-medium ${
+              preset === item.id
+                ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                : 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200'
+            }`}
+          >
+            {item.label}
+          </button>
+        ))}
+        {preset === 'custom' && (
+          <>
+            <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="input-field max-w-[140px]" />
+            <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="input-field max-w-[140px]" />
+          </>
+        )}
+        <select value={countryFilter} onChange={(e) => setCountryFilter(e.target.value)} className="input-field max-w-[160px]">
+          <option value="all">All countries</option>
+          {metrics.countryOptions.map((item) => (
+            <option key={item} value={item}>
+              {item}
+            </option>
+          ))}
+        </select>
+        <select value={platformFilter} onChange={(e) => setPlatformFilter(e.target.value)} className="input-field max-w-[160px]">
+          <option value="all">All platforms</option>
+          {metrics.platformOptions.map((item) => (
+            <option key={item} value={item}>
+              {item}
+            </option>
+          ))}
+        </select>
+        <select value={userTypeFilter} onChange={(e) => setUserTypeFilter(e.target.value)} className="input-field max-w-[160px]">
+          <option value="all">All user types</option>
+          <option value="host">Hosts</option>
+          <option value="user">Users</option>
+        </select>
+      </div>
+
+      {error && <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
+
+      <ActionCenter metrics={metrics} availability={availability} />
+
+      <section>
+        <div className="mb-2 flex items-end justify-between">
+          <h2 className="text-sm font-semibold">Executive overview</h2>
+          <p className="text-[11px] text-gray-400">{metrics.totalUsers} users in current filters</p>
+        </div>
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">
+          <KpiCard title="Registered" value={formatCompact(metrics.totalUsers)} icon={Users} href="/users" sparkline={metrics.sparkline} hint="All matching filters" tone="blue" />
+          <KpiCard title="DAU (24h)" value={formatCompact(metrics.activeUsers)} icon={UserCheck} href="/users" hint="lastActive within 24h" tone="emerald" />
+          <KpiCard title="MAU (30d)" value={formatCompact(metrics.mauUsers)} icon={Users} href="/users" hint="lastActive within 30d" tone="sky" />
+          <KpiCard title="Online now" value={formatCompact(metrics.onlineUsers)} icon={Activity} href="/users" hint="last 5 minutes" tone="teal" />
+          <KpiCard title="New in range" value={formatCompact(metrics.newInRange)} icon={Users} href="/users" trend={metrics.rangeUserChange} sparkline={metrics.sparkline} tone="indigo" />
+          <KpiCard title="Live / viewers" value={`${metrics.liveRooms} / ${formatCompact(metrics.liveViewers)}`} icon={Radio} tone="rose" />
+          <KpiCard title="Revenue (range)" value={`₹${formatCompact(metrics.revenueInRange)}`} icon={DollarSign} href="/transactions" trend={metrics.revenueChange} tone="emerald" />
+          <KpiCard title="Payouts / reports" value={`${metrics.pendingWithdrawals} / ${metrics.pendingReports}`} icon={metrics.pendingReports ? Shield : Wallet} href={metrics.pendingReports ? '/complaints' : '/transactions'} tone="orange" />
+        </div>
+      </section>
+
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-12">
+        <div className="xl:col-span-7">
+          <LiveOps liveStreams={liveStreams} metrics={metrics} stoppingStream={stoppingStream} onStopStream={handleStopStream} />
+        </div>
+        <div className="xl:col-span-5">
+          <EconomyPanel metrics={metrics} availability={availability} />
+        </div>
+      </div>
+
+      <SafetyFeed metrics={metrics} />
+      <HostsAnalytics
+        metrics={metrics}
+        availability={availability}
+        detailsOpen={detailsOpen}
+        onToggleDetails={() => setDetailsOpen((value) => !value)}
+      />
+      <SystemStrip health={health} />
     </div>
   )
 }
 
 export default Dashboard
-
-
-
-
-
-

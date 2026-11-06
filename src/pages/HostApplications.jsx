@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
-import { Filter, Eye, CheckCircle, XCircle, Clock, AlertCircle, UserCheck, UserX } from 'lucide-react'
+import { Eye, CheckCircle, XCircle, Clock, AlertCircle, UserCheck, UserX } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import SearchBar from '../components/SearchBar'
 import Table from '../components/Table'
 import Modal from '../components/Modal'
 import Loader from '../components/Loader'
 import EmptyState from '../components/EmptyState'
-import ErrorState from '../components/ErrorState'
+import PageHeader from '../components/PageHeader'
+import Panel from '../components/Panel'
+import StatusBadge from '../components/StatusBadge'
+import KpiCard from '../components/KpiCard'
 import { collection, doc, updateDoc, onSnapshot, query, orderBy, serverTimestamp, getDoc, getDocs } from 'firebase/firestore'
 import { db } from '../firebase/config'
 
@@ -555,17 +557,9 @@ const HostApplications = () => {
       render: (row) => {
         const status = row?.status || 'Pending'
         return (
-          <span
-            className={`px-2 py-1 rounded-full text-xs font-medium ${
-              status === 'Approved'
-                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                : status === 'Rejected'
-                ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-            }`}
-          >
+          <StatusBadge tone={status === 'Approved' ? 'success' : status === 'Rejected' ? 'danger' : 'warning'}>
             {status}
-          </span>
+          </StatusBadge>
         )
       }
     },
@@ -635,162 +629,68 @@ const HostApplications = () => {
   }
 
   if (loading) {
-    return <Loader />
+    return (
+      <div className="page-shell">
+        <PageHeader title="Host applications" description="Loading applications..." />
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <Loader />
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-8 relative -mt-2">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-            <div className="w-10 h-10 bg-pink-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(-5deg)' }}>
-              <UserCheck className="w-6 h-6 text-white" />
-            </div>
-            Host Applications
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Manage and approve host account applications
-          </p>
-        </div>
-      </div>
+    <div className="page-shell">
+      <PageHeader title="Host applications" description="Review and approve host account applications." />
 
-      {/* Error Message */}
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
           <div>
-            <p className="text-red-800 dark:text-red-300 font-medium">Error Loading Applications</p>
-            <p className="text-red-600 dark:text-red-400 text-sm mt-1">{error}</p>
-            {error.includes('Permission denied') && (
-              <p className="text-red-600 dark:text-red-400 text-xs mt-2">
-                ⚠️ Please update Firestore security rules to allow read access to "hosts_application" collection for authenticated admin users.
-              </p>
-            )}
+            <p className="font-medium">Could not load applications</p>
+            <p className="text-xs mt-1">{error}</p>
           </div>
         </div>
       )}
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Total Applications</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-                {statusCounts.All}
-              </p>
-            </div>
-            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-              <UserCheck className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Pending</p>
-              <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400 mt-1">
-                {statusCounts.Pending}
-              </p>
-            </div>
-            <div className="p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
-              <Clock className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Approved</p>
-              <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
-                {statusCounts.Approved}
-              </p>
-            </div>
-            <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
-              <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Rejected</p>
-              <p className="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">
-                {statusCounts.Rejected}
-              </p>
-            </div>
-            <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-lg">
-              <UserX className="w-6 h-6 text-red-600 dark:text-red-400" />
-            </div>
-          </div>
-        </motion.div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <KpiCard title="Total" value={statusCounts.All} icon={UserCheck} />
+        <KpiCard title="Pending" value={statusCounts.Pending} icon={Clock} />
+        <KpiCard title="Approved" value={statusCounts.Approved} icon={CheckCircle} />
+        <KpiCard title="Rejected" value={statusCounts.Rejected} icon={UserX} />
       </div>
 
-      {/* Filters and Search */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1">
-            <SearchBar
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by name, email, user ID, or reason..."
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <Filter className="w-5 h-5 text-gray-500 dark:text-gray-400" />
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            >
-              <option value="All">All Status</option>
-              <option value="Pending">Pending</option>
-              <option value="Approved">Approved</option>
-              <option value="Rejected">Rejected</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Applications Table */}
-      {filteredApplications.length === 0 ? (
-        <EmptyState
-          icon={UserCheck}
-          title={applications.length === 0
-            ? 'No host applications found'
-            : 'No applications match your search criteria'}
-          description={applications.length === 0
-            ? 'Applications submitted by users will appear here once they apply to become hosts.'
-            : 'Try adjusting your search or filter settings to find applications.'}
+      <div className="filter-bar">
+        <SearchBar
+          value={searchTerm}
+          onChange={setSearchTerm}
+          placeholder="Search name, email, user ID, or reason"
         />
-      ) : (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          className="text-xs border rounded-md px-2 py-1.5 bg-transparent"
+        >
+          <option value="All">All status</option>
+          <option value="Pending">Pending</option>
+          <option value="Approved">Approved</option>
+          <option value="Rejected">Rejected</option>
+        </select>
+      </div>
+
+      <Panel title="Applications" action={<span className="text-[11px] text-gray-500">{filteredApplications.length} shown</span>} padded={false}>
+        {filteredApplications.length === 0 ? (
+          <EmptyState
+            icon={UserCheck}
+            title={applications.length === 0 ? 'No host applications' : 'No applications match your search'}
+            description={applications.length === 0
+              ? 'Applications appear here when users apply to host.'
+              : 'Try adjusting search or filters.'}
+          />
+        ) : (
           <Table columns={columns} data={tableRows} />
-        </div>
-      )}
+        )}
+      </Panel>
 
       {/* Application Detail Modal */}
       <Modal
@@ -942,7 +842,7 @@ const HostApplications = () => {
                 <button
                   onClick={() => handleApprove(selectedApplication.id, selectedApplication.userId)}
                   disabled={processing}
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="btn-primary flex-1 disabled:opacity-50"
                 >
                   <CheckCircle className="w-5 h-5" />
                   Approve Application
@@ -989,14 +889,14 @@ const HostApplications = () => {
                 setShowApproveConfirm(false)
                 setApplicationToProcess(null)
               }}
-              className="flex-1 px-4 py-2.5 border-2 border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors font-semibold"
+              className="btn-secondary flex-1"
               disabled={processing}
             >
               Cancel
             </button>
             <button
               onClick={confirmApprove}
-              className="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-semibold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-primary flex-1 disabled:opacity-50"
               disabled={processing}
             >
               {processing ? (
@@ -1043,14 +943,14 @@ const HostApplications = () => {
                 setShowRejectConfirm(false)
                 setApplicationToProcess(null)
               }}
-              className="flex-1 px-4 py-2.5 border-2 border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors font-semibold"
+              className="btn-secondary flex-1"
               disabled={processing}
             >
               Cancel
             </button>
             <button
               onClick={confirmReject}
-              className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-semibold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-danger flex-1 disabled:opacity-50"
               disabled={processing}
             >
               {processing ? (

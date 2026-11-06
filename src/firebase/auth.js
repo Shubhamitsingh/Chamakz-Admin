@@ -1,17 +1,11 @@
-import { 
-  signInWithEmailAndPassword, 
-  signOut, 
+import {
+  signInWithEmailAndPassword,
+  signOut,
   onAuthStateChanged,
-  sendPasswordResetEmail 
+  sendPasswordResetEmail,
 } from 'firebase/auth'
 import { auth } from './config'
 
-/**
- * Sign in admin user with email and password
- * @param {string} email - Admin email
- * @param {string} password - Admin password
- * @returns {Promise} User credentials
- */
 export const loginAdmin = async (email, password) => {
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password)
@@ -22,10 +16,6 @@ export const loginAdmin = async (email, password) => {
   }
 }
 
-/**
- * Sign out current admin user
- * @returns {Promise} Success status
- */
 export const logoutAdmin = async () => {
   try {
     await signOut(auth)
@@ -36,20 +26,10 @@ export const logoutAdmin = async () => {
   }
 }
 
-/**
- * Listen to authentication state changes
- * @param {Function} callback - Callback function with user data
- * @returns {Function} Unsubscribe function
- */
 export const onAuthChange = (callback) => {
   return onAuthStateChanged(auth, callback)
 }
 
-/**
- * Send password reset email
- * @param {string} email - User email
- * @returns {Promise} Success status
- */
 export const resetPassword = async (email) => {
   try {
     await sendPasswordResetEmail(auth, email)
@@ -60,21 +40,6 @@ export const resetPassword = async (email) => {
   }
 }
 
-/**
- * Get current authenticated user
- * @returns {Object|null} Current user or null
- */
 export const getCurrentUser = () => {
-  return auth.currentUser
+  return auth?.currentUser || null
 }
-
-
-
-
-
-
-
-
-
-
-

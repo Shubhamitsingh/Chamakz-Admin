@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
-import { Filter, Eye, Ban, CheckCircle, Users as UsersIcon, AlertCircle, Video, VideoOff, Activity } from 'lucide-react'
+import { Eye, Ban, CheckCircle, Users as UsersIcon, AlertCircle, Video, VideoOff } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import SearchBar from '../components/SearchBar'
 import Table from '../components/Table'
@@ -10,6 +9,10 @@ import EmptyState from '../components/EmptyState'
 import ErrorState from '../components/ErrorState'
 import Pagination from '../components/Pagination'
 import ExportButton from '../components/ExportButton'
+import PageHeader from '../components/PageHeader'
+import Panel from '../components/Panel'
+import StatusBadge from '../components/StatusBadge'
+import KpiCard from '../components/KpiCard'
 import { collection, doc, updateDoc, onSnapshot, serverTimestamp } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { fixIncorrectNewUserPermissions } from '../firebase/users'
@@ -235,12 +238,18 @@ const Users = () => {
         updatedAt: serverTimestamp()
       }
       
-      // If approving, set liveApprovalDate
+      // If approving, set all host-related fields (CRITICAL for user app to show hosts)
       if (newStatus === true) {
         updateData.liveApprovalDate = serverTimestamp()
+        updateData.role = 'Host'  // CRITICAL: User app queries hosts by role field
+        updateData.isHost = true  // For user app compatibility
+        updateData.hostStatus = 'approved'  // Status tracking
       } else {
-        // If disapproving, clear approval date
+        // If disapproving, clear approval date and reset role to User
         updateData.liveApprovalDate = null
+        updateData.role = 'User'  // Reset role when disapproved
+        updateData.isHost = false  // Remove host status
+        updateData.hostStatus = null  // Clear status
       }
       
       await updateDoc(userRef, updateData)
@@ -343,7 +352,7 @@ const Users = () => {
       accessor: 'numericUserId',
       render: (row) => (
         <div>
-          <span className="font-mono text-sm font-bold text-pink-600 dark:text-pink-400 bg-pink-50 dark:bg-pink-900/20 px-2 py-0.5 rounded block">
+          <span className="font-mono text-xs font-medium bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded-md block">
             {row?.numericUserId || 'N/A'}
           </span>
           <span className="text-xs text-gray-500 font-mono">
@@ -395,14 +404,7 @@ const Users = () => {
         const role = row?.role || 'User'
         const isHost = role === 'Host'
         return (
-          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-            isHost 
-              ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' 
-              : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
-          }`}>
-            {isHost && '🎥 '}
-            {role}
-          </span>
+          <StatusBadge tone={isHost ? 'info' : 'neutral'}>{role}</StatusBadge>
         )
       }
     },
@@ -412,13 +414,7 @@ const Users = () => {
       render: (row) => {
         const status = row?.status || 'Active'
         return (
-          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-            status === 'Active' 
-              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
-              : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-          }`}>
-            {status}
-          </span>
+          <StatusBadge tone={status === 'Active' ? 'success' : 'danger'}>{status}</StatusBadge>
         )
       },
     },
@@ -428,25 +424,9 @@ const Users = () => {
       render: (row) => {
         const isApproved = row?.isActive === true // Only true means approved, everything else is not approved
         return (
-          <div className="flex items-center gap-2">
-            <span className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${
-              isApproved 
-                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
-                : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-            }`}>
-              {isApproved ? (
-                <>
-                  <Video className="w-3 h-3" />
-                  Approved
-                </>
-              ) : (
-                <>
-                  <VideoOff className="w-3 h-3" />
-                  Not Approved
-                </>
-              )}
-            </span>
-          </div>
+          <StatusBadge tone={isApproved ? 'success' : 'danger'} icon={isApproved ? Video : VideoOff}>
+            {isApproved ? 'Approved' : 'Not approved'}
+          </StatusBadge>
         )
       },
     },
@@ -546,31 +526,31 @@ const Users = () => {
                 setSelectedUser(row)
                 setShowUserModal(true)
               }}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
               title="View Profile"
             >
-              <Eye className="w-4 h-4" />
+              <Eye className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => {
                 const newStatus = row.status === 'Active' ? 'Blocked' : 'Active'
                 handleUpdateUser(row.id, { status: newStatus })
               }}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
               title={row.status === 'Active' ? 'Block' : 'Activate'}
             >
               {row.status === 'Active' ? (
-                <Ban className="w-4 h-4 text-red-500" />
+                <Ban className="w-3.5 h-3.5 text-red-600" />
               ) : (
-                <CheckCircle className="w-4 h-4 text-green-500" />
+                <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
               )}
             </button>
             <button
               onClick={() => handleToggleLiveApproval(row.id, isApproved)}
-              className={`p-2 rounded-lg transition-colors ${
+              className={`p-1.5 rounded-md ${
                 isApproved
-                  ? 'hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400'
-                  : 'hover:bg-green-100 dark:hover:bg-green-900/30 text-green-600 dark:text-green-400'
+                  ? 'hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600'
+                  : 'hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-emerald-700'
               }`}
               title={isApproved ? 'Disapprove Live Streaming' : 'Approve Live Streaming'}
             >
@@ -586,41 +566,21 @@ const Users = () => {
     },
   ]
 
-  // Show loading state
   if (loading && !error) {
     return (
-      <div className="space-y-6 p-6">
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-            <UsersIcon className="w-8 h-8 text-primary-500" />
-            Users
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">Loading users...</p>
-        </motion.div>
-        <div className="flex items-center justify-center min-h-[400px]">
+      <div className="page-shell">
+        <PageHeader title="Users" description="Loading users..." />
+        <div className="flex min-h-[40vh] items-center justify-center">
           <Loader />
         </div>
       </div>
     )
   }
 
-  // Show error state
   if (error) {
     return (
-      <div className="space-y-6 p-6">
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-            <UsersIcon className="w-8 h-8 text-primary-500" />
-            Users
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">Manage user accounts, permissions, and live streaming access</p>
-        </motion.div>
+      <div className="page-shell">
+        <PageHeader title="Users" description="Manage accounts, permissions, and live streaming access." />
         <ErrorState
           error={new Error(error)}
           context="loading users"
@@ -634,208 +594,79 @@ const Users = () => {
   }
 
   return (
-    <div className="space-y-8 relative -mt-6">
-      {/* 2D Decorative Background Elements */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-5">
-        <div className="absolute top-20 right-20 w-64 h-64 bg-pink-300 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-20 left-20 w-48 h-48 bg-purple-300 rounded-full blur-2xl"></div>
+    <div className="page-shell">
+      <PageHeader
+        title="Users"
+        description="Manage accounts, permissions, and live streaming access."
+        actions={
+          <button
+            type="button"
+            onClick={handleFixIncorrectPermissions}
+            disabled={fixingPermissions || loading}
+            className="btn-secondary"
+            title="Fix new users who incorrectly have live permission enabled"
+          >
+            <AlertCircle className="w-3.5 h-3.5" />
+            {fixingPermissions ? 'Fixing...' : 'Fix permissions'}
+          </button>
+        }
+      />
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <KpiCard title="Total users" value={liveApprovalStats.total} icon={UsersIcon} />
+        <KpiCard title="Live approved" value={liveApprovalStats.approved} icon={Video} />
+        <KpiCard title="Not approved" value={liveApprovalStats.notApproved} icon={VideoOff} />
+        <KpiCard title="Online now" value={activeUsersCount.toLocaleString()} icon={CheckCircle} hint="last 5 minutes" />
       </div>
 
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between relative z-10"
-      >
-        <div>
-          <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-            <div className="w-10 h-10 bg-pink-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(-5deg)' }}>
-              <UsersIcon className="w-6 h-6 text-white" />
-            </div>
-            Users
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">Manage user accounts, permissions, and live streaming access</p>
-        </div>
-        <button
-          onClick={handleFixIncorrectPermissions}
-          disabled={fixingPermissions || loading}
-          className="btn-secondary flex items-center gap-2 disabled:opacity-50"
-          title="Fix new users who incorrectly have live permission enabled"
-        >
-          {fixingPermissions ? (
-            <>
-              <div className="w-4 h-4 border-2 border-gray-400/30 border-t-gray-600 rounded-full animate-spin" />
-              Fixing...
-            </>
-          ) : (
-            <>
-              <AlertCircle className="w-4 h-4" />
-              Fix Permissions
-            </>
-          )}
-        </button>
-      </motion.div>
-
-      {/* Stats Cards - 2D Style */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 relative z-10">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }} 
-          animate={{ opacity: 1, y: 0 }} 
-          className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 flex items-center gap-4 relative overflow-hidden"
-          style={{ boxShadow: 'none' }}
-        >
-          <div className="absolute top-0 left-0 w-full h-1 bg-pink-500 rounded-t-2xl"></div>
-          <div className="w-14 h-14 bg-pink-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(-5deg)' }}>
-            <UsersIcon className="w-7 h-7 text-white" />
-          </div>
-          <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Total Users</p>
-            <p className="text-2xl font-bold">{liveApprovalStats.total}</p>
-          </div>
-        </motion.div>
-
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }} 
-          animate={{ opacity: 1, y: 0 }} 
-          transition={{ delay: 0.1 }} 
-          className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 flex items-center gap-4 relative overflow-hidden"
-          style={{ boxShadow: 'none' }}
-        >
-          <div className="absolute top-0 left-0 w-full h-1 bg-purple-500 rounded-t-2xl"></div>
-          <div className="w-14 h-14 bg-purple-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(5deg)' }}>
-            <Video className="w-7 h-7 text-white" />
-          </div>
-          <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Live Approved</p>
-            <p className="text-2xl font-bold">{liveApprovalStats.approved}</p>
-          </div>
-        </motion.div>
-
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }} 
-          animate={{ opacity: 1, y: 0 }} 
-          transition={{ delay: 0.2 }} 
-          className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 flex items-center gap-4 relative overflow-hidden"
-          style={{ boxShadow: 'none' }}
-        >
-          <div className="absolute top-0 left-0 w-full h-1 bg-orange-500 rounded-t-2xl"></div>
-          <div className="w-14 h-14 bg-orange-500 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(-5deg)' }}>
-            <VideoOff className="w-7 h-7 text-white" />
-          </div>
-          <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Not Approved</p>
-            <p className="text-2xl font-bold">{liveApprovalStats.notApproved}</p>
-          </div>
-        </motion.div>
-
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }} 
-          animate={{ opacity: 1, y: 0 }} 
-          transition={{ delay: 0.3 }} 
-          className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 flex items-center gap-4 relative overflow-hidden"
-          style={{ boxShadow: 'none' }}
-        >
-          <div className="absolute top-0 left-0 w-full h-1 bg-primary-400 rounded-t-2xl"></div>
-          <div className="w-14 h-14 bg-primary-400 rounded-xl flex items-center justify-center" style={{ transform: 'rotate(5deg)' }}>
-            <CheckCircle className="w-7 h-7 text-white" />
-          </div>
-          <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Active Users</p>
-            <p className="text-2xl font-bold">{activeUsersCount.toLocaleString()}</p>
-            <p className="text-xs text-gray-500 mt-1">currently using app</p>
-          </div>
-        </motion.div>
+      <div className="filter-bar">
+        <SearchBar
+          placeholder="Search name, email, phone, or user ID"
+          value={searchTerm}
+          onChange={setSearchTerm}
+        />
+        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="text-xs border rounded-md px-2 py-1.5 bg-transparent">
+          <option value="All">All status</option>
+          <option value="Active">Active</option>
+          <option value="Blocked">Blocked</option>
+          <option value="Currently Using App">Currently using app</option>
+        </select>
+        <select value={filterLiveApproval} onChange={(e) => setFilterLiveApproval(e.target.value)} className="text-xs border rounded-md px-2 py-1.5 bg-transparent">
+          <option value="All">All live status</option>
+          <option value="Approved">Live approved</option>
+          <option value="Not Approved">Not approved</option>
+        </select>
+        <ExportButton data={filteredUsers} columns={columns} filename="users" disabled={filteredUsers.length === 0} />
       </div>
 
-      {/* Filters */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 relative z-10"
-        style={{ boxShadow: 'none' }}
-      >
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-          <div className="flex-1">
-            <SearchBar
-              placeholder="Search by name, email, phone number, or numeric user ID..."
-              value={searchTerm}
-              onChange={setSearchTerm}
-            />
-          </div>
-          <div className="flex gap-2 items-center">
-            <Filter className="w-5 h-5 text-gray-500" />
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="input-field"
-            >
-              <option value="All">All Status</option>
-              <option value="Active">Active</option>
-              <option value="Blocked">Blocked</option>
-              <option value="Currently Using App">Currently Using App</option>
-            </select>
-            <select
-              value={filterLiveApproval}
-              onChange={(e) => setFilterLiveApproval(e.target.value)}
-              className="input-field"
-            >
-              <option value="All">All Live Status</option>
-              <option value="Approved">Live Approved</option>
-              <option value="Not Approved">Not Approved</option>
-            </select>
-            <ExportButton
-              data={filteredUsers}
-              columns={columns}
-              filename="users"
-              disabled={filteredUsers.length === 0}
-            />
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Users Table */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="bg-white dark:bg-gray-800 rounded-2xl p-6 border-2 border-gray-100 dark:border-gray-700 relative z-10"
-        style={{ boxShadow: 'none' }}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold flex items-center gap-2">
-            <div className="w-1 h-6 bg-pink-500 rounded-full"></div>
-            All Users ({filteredUsers.length})
-          </h2>
-        </div>
+      <Panel title="All users" action={<span className="text-[11px] text-gray-500">{filteredUsers.length} shown</span>} padded={false}>
         {filteredUsers.length === 0 ? (
           <EmptyState
             icon={UsersIcon}
-            title={users.length === 0 ? 'No users found' : 'No users match your search criteria'}
+            title={users.length === 0 ? 'No users found' : 'No users match your search'}
             description={users.length === 0
               ? 'Users will appear here once they register in the app.'
-              : 'Try adjusting your search or filter settings to find users.'}
+              : 'Try adjusting search or filters.'}
           />
         ) : (
           <>
             <Table columns={columns} data={paginatedUsers} />
-            {totalPages > 1 && (
-              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  totalItems={filteredUsers.length}
-                  itemsPerPage={itemsPerPage}
-                  onPageChange={setCurrentPage}
-                  onItemsPerPageChange={(newItemsPerPage) => {
-                    setItemsPerPage(newItemsPerPage)
-                    setCurrentPage(1)
-                  }}
-                />
-              </div>
-            )}
+            <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-700">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={filteredUsers.length}
+                itemsPerPage={itemsPerPage}
+                onPageChange={setCurrentPage}
+                onItemsPerPageChange={(newItemsPerPage) => {
+                  setItemsPerPage(newItemsPerPage)
+                  setCurrentPage(1)
+                }}
+              />
+            </div>
           </>
         )}
-      </motion.div>
+      </Panel>
 
       {/* User Detail Modal */}
       {selectedUser && (
@@ -853,7 +684,7 @@ const Users = () => {
                 className="rounded-2xl"
               />
               <div>
-                <h3 className="text-2xl font-bold">{selectedUser.name || 'Unknown User'}</h3>
+                <h3 className="text-sm font-semibold">{selectedUser.name || 'Unknown User'}</h3>
                 <p className="text-gray-600 dark:text-gray-400">
                   {selectedUser.email && selectedUser.email !== 'No email' 
                     ? selectedUser.email 
@@ -865,7 +696,7 @@ const Users = () => {
                     : 'No phone'}
                 </p>
                 <div className="mt-2 space-y-1">
-                  <p className="text-sm font-mono font-bold text-pink-600 dark:text-pink-400 bg-pink-50 dark:bg-pink-900/20 px-2 py-0.5 rounded inline-block">
+                  <p className="text-xs font-mono bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded-md inline-block">
                     User ID: {selectedUser.numericUserId || 'N/A'}
                   </p>
                   <p className="text-xs font-mono text-gray-500">
@@ -874,33 +705,33 @@ const Users = () => {
                 </div>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Email</p>
+                <p className="text-[11px] uppercase tracking-wide text-gray-500">Email</p>
                 <p className="font-medium">{selectedUser.email && selectedUser.email !== 'No email' ? selectedUser.email : 'No email'}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Phone</p>
+                <p className="text-[11px] uppercase tracking-wide text-gray-500">Phone</p>
                 <p className="font-medium">{selectedUser.phone && selectedUser.phone !== 'No phone' ? selectedUser.phone : 'No phone'}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Role</p>
+                <p className="text-[11px] uppercase tracking-wide text-gray-500">Role</p>
                 <p className="font-medium">{selectedUser.role || 'User'}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Status</p>
+                <p className="text-[11px] uppercase tracking-wide text-gray-500">Status</p>
                 <p className="font-medium">{selectedUser.status || 'Active'}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Coins</p>
+                <p className="text-[11px] uppercase tracking-wide text-gray-500">Coins</p>
                 <p className="font-medium">{((selectedUser.coins) || 0).toLocaleString()}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Join Date</p>
+                <p className="text-[11px] uppercase tracking-wide text-gray-500">Join date</p>
                 <p className="font-medium">{selectedUser.joinDate || 'N/A'}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Last Active</p>
+                <p className="text-[11px] uppercase tracking-wide text-gray-500">Last active</p>
                 <div className="flex items-center gap-2">
                   {selectedUser.lastActive && selectedUser.lastActive !== 'N/A' && selectedUser.lastActive instanceof Date ? (
                     <>
@@ -932,26 +763,10 @@ const Users = () => {
                 )}
               </div>
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Live Streaming Approval</p>
-                <div className="flex items-center gap-2">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${
-                    selectedUser.isActive === true
-                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
-                      : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                  }`}>
-                    {selectedUser.isActive === true ? (
-                      <>
-                        <Video className="w-3 h-3" />
-                        Approved
-                      </>
-                    ) : (
-                      <>
-                        <VideoOff className="w-3 h-3" />
-                        Not Approved
-                      </>
-                    )}
-                  </span>
-                </div>
+                <p className="text-[11px] uppercase tracking-wide text-gray-500">Live streaming</p>
+                <StatusBadge tone={selectedUser.isActive === true ? 'success' : 'danger'} icon={selectedUser.isActive === true ? Video : VideoOff}>
+                  {selectedUser.isActive === true ? 'Approved' : 'Not approved'}
+                </StatusBadge>
               </div>
             </div>
             <div className="flex gap-2 pt-4">
@@ -975,11 +790,7 @@ const Users = () => {
                     isActive: !currentApproval
                   })
                 }}
-                className={`${
-                  selectedUser.isActive === true
-                    ? 'bg-red-600 hover:bg-red-700 text-white'
-                    : 'bg-green-600 hover:bg-green-700 text-white'
-                } flex-1 px-4 py-2.5 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2`}
+                className={`${selectedUser.isActive === true ? 'btn-danger' : 'btn-primary'} flex-1`}
               >
                 {selectedUser.isActive === true ? (
                   <>
