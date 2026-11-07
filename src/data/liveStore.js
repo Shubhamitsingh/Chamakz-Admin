@@ -87,6 +87,8 @@ export async function loadAdminData() {
     appVersion: row.app_version || '',
     agency: row.agency_name || '',
     isHost: row.is_host,
+    userLevel: row.user_level ?? 0,
+    hostLevel: row.host_level ?? 0,
     restrictions: { live: row.restrict_live, chat: row.restrict_chat },
     notes: [],
     audit: [],

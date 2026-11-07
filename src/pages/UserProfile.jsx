@@ -167,6 +167,8 @@ const UserProfile = () => {
             <Field label="Last active" value={formatWhen(user.lastActive)} />
             <Field label="Account status" value={user.status} />
             <Field label="User type" value={user.userType} />
+            <Field label="User level" value={user.userLevel ?? 'Not saved'} />
+            <Field label="Host level" value={user.hostLevel ?? 'Not saved'} />
             <Field label="Profile completion" value={`${user.profileComplete}%`} />
           </div>
         </Panel>

@@ -30,13 +30,12 @@ import Purchases from './pages/economy/Purchases'
 import { HostWallets, UserWallets } from './pages/economy/Wallets'
 import GiftsPage from './pages/economy/GiftsPage'
 import Revenue from './pages/economy/Revenue'
-import Withdrawals from './pages/economy/Withdrawals'
 import Circulation from './pages/economy/Circulation'
 import Reports from './pages/economy/Reports'
 import Audit from './pages/economy/Audit'
-import EconomySettings from './pages/economy/EconomySettings'
 import { ControlProvider } from './control/ControlContext'
 import { ConfigPage, ControlHome, HistoryPage, RolesPage } from './pages/control/ControlPages'
+import { BlocksPage, CoinPacksPage, FollowsPage, HostPerformancePage, KycPage, LevelsPage, NearbyPage, NotificationSwitchesPage, PrivateCallsPage, PrivateChatsPage, ReferralsPage, TelegramPage, WarningsPage } from './pages/app-control/UserAppPages'
 
 function App() {
   return (
@@ -84,11 +83,11 @@ function App() {
               <Route path="host-wallets" element={<HostWallets />} />
               <Route path="gifts" element={<GiftsPage />} />
               <Route path="revenue" element={<Revenue />} />
-              <Route path="withdrawals" element={<Withdrawals />} />
+              <Route path="withdrawals" element={<Navigate to="/transactions" replace />} />
               <Route path="circulation" element={<Circulation />} />
               <Route path="reports" element={<Reports />} />
               <Route path="audit" element={<Audit />} />
-              <Route path="settings" element={<EconomySettings />} />
+              <Route path="settings" element={<Navigate to="/control/diamonds" replace />} />
             </Route>
             <Route path="control" element={<ControlProvider><Outlet /></ControlProvider>}>
               <Route index element={<ControlHome />} />
@@ -97,6 +96,20 @@ function App() {
               <Route path="roles" element={<RolesPage />} />
               <Route path=":categoryId" element={<ConfigPage />} />
             </Route>
+            <Route path="app" element={<Navigate to="/app/warnings" replace />} />
+            <Route path="app/warnings" element={<WarningsPage />} />
+            <Route path="app/levels" element={<LevelsPage />} />
+            <Route path="app/referrals" element={<ReferralsPage />} />
+            <Route path="app/calls" element={<PrivateCallsPage />} />
+            <Route path="app/follows" element={<FollowsPage />} />
+            <Route path="app/blocks" element={<BlocksPage />} />
+            <Route path="app/private-chats" element={<PrivateChatsPage />} />
+            <Route path="app/kyc" element={<KycPage />} />
+            <Route path="app/host-performance" element={<HostPerformancePage />} />
+            <Route path="app/coin-packs" element={<CoinPacksPage />} />
+            <Route path="app/telegram" element={<TelegramPage />} />
+            <Route path="app/nearby" element={<NearbyPage />} />
+            <Route path="app/notification-switches" element={<NotificationSwitchesPage />} />
             <Route path="settings" element={<Settings />} />
             </Route>
           </Routes>

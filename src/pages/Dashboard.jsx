@@ -165,7 +165,7 @@ const Dashboard = () => {
           <KpiCard title="New in range" value={formatCompact(metrics.newInRange)} icon={Users} href="/users" trend={metrics.rangeUserChange} sparkline={metrics.sparkline} tone="indigo" />
           <KpiCard title="Live / viewers" value={`${metrics.liveRooms} / ${formatCompact(metrics.liveViewers)}`} icon={Radio} sparkline={metrics.activeSparkline} tone="blue" />
           <KpiCard title="Platform revenue" value={inr(economyTotals.platformShare)} icon={DollarSign} href="/economy" hint="Our share of gifted diamonds" tone="emerald" />
-          <KpiCard title="Paid / left" value={`${inr(economyTotals.paidWithdrawals)} / ${inr(economyTotals.hostEntitlement - economyTotals.paidWithdrawals)}`} icon={Wallet} href="/economy/withdrawals" hint="Paid to hosts / still to pay" tone="amber" />
+          <KpiCard title="Paid / left" value={`${inr(economyTotals.paidWithdrawals)} / ${inr(economyTotals.hostEntitlement - economyTotals.paidWithdrawals)}`} icon={Wallet} href="/transactions" hint="Paid to hosts / still to pay" tone="amber" />
                 </div>
       </section>
 

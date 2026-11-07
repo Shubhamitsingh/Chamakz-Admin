@@ -100,8 +100,8 @@ const EconomyPanel = ({ preset = '30d', customStart = '', customEnd = '' }) => {
         <Row tone="rose" label="Refunds" note="Reversed payments in this range" value={inr(review.refundInr)} to="/economy/purchases" />
         <Row tone="slate" label="User wallets" note="Diamonds still held by users" value={diamonds(review.userWalletDiamonds)} to="/economy/user-wallets" />
         <Row tone="violet" label="Host earning wallets" note="Diamonds received and still held" value={diamonds(review.hostEarnedDiamonds)} to="/economy/host-wallets" />
-        <Row tone="amber" label="Pending withdrawals" note="Waiting for approval or payout" value={inr(review.pendingWithdrawals)} to="/economy/withdrawals" />
-        <Row tone="sky" label="Paid to hosts" note="Withdrawals already marked paid" value={inr(review.paidWithdrawals)} to="/economy/withdrawals" />
+        <Row tone="amber" label="Pending withdrawals" note="Waiting for approval or payout" value={inr(review.pendingWithdrawals)} to="/transactions" />
+        <Row tone="sky" label="Paid to hosts" note="Withdrawals already marked paid" value={inr(review.paidWithdrawals)} to="/transactions" />
       </div>
       <div className="mt-3 h-36">
         <p className="mb-1 text-[11px] uppercase tracking-wide text-gray-500">Platform revenue from gifts in this range</p>

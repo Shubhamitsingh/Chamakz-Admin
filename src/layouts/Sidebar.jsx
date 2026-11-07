@@ -21,6 +21,7 @@ import {
   BarChart3,
   LifeBuoy,
   Megaphone,
+  Smartphone,
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import useMediaQuery from '../hooks/useMediaQuery'
@@ -30,7 +31,10 @@ const pathMatches = (pathname, target, exact) => (
   exact ? pathname === target : pathname === target || pathname.startsWith(`${target}/`)
 )
 
-const groupActive = (pathname, item) => item.children.some((child) => pathMatches(pathname, child.path, child.exact))
+const groupActive = (pathname, item) => (
+  (item.match && pathMatches(pathname, item.match))
+  || item.children.some((child) => pathMatches(pathname, child.path, child.exact))
+)
 
 const Sidebar = () => {
   const { 
@@ -64,13 +68,15 @@ const Sidebar = () => {
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     {
       path: '/users',
+      match: '/users',
       icon: Users,
       label: 'User Management',
       badge: newUsersCount,
-      children: [...USER_SEGMENTS.map((item) => ({ ...item, exact: item.path === '/users' })), { id: 'analytics', path: USER_ANALYTICS_PATH, label: 'User Analytics' }],
+      children: [...USER_SEGMENTS.map((item) => ({ ...item, exact: item.path === '/users' })), { id: 'analytics', path: USER_ANALYTICS_PATH, label: 'User Analytics' }, { id: 'follows', path: '/app/follows', label: 'Follows' }],
     },
     { path: '/host-applications', icon: UserCheck, label: 'Host Applications', badge: pendingHostApplicationsCount },
     { path: '/live-streaming', icon: Video, label: 'Live rooms' },
+    { path: '/app/calls', icon: Video, label: 'Private call log' },
     { path: '/chats', icon: MessageSquare, label: 'Chats', badge: unreadChatsCount },
     { path: '/gifts', icon: Gift, label: 'Gift catalog' },
     {
@@ -89,7 +95,6 @@ const Sidebar = () => {
         { id: 'circulation', path: '/economy/circulation', label: 'Diamond Circulation' },
         { id: 'reports', path: '/economy/reports', label: 'Financial Reports' },
         { id: 'ledger-audit', path: '/economy/audit', label: 'Ledger audit' },
-        { id: 'ledger-rates', path: '/economy/settings', label: 'Demo ledger rates' },
       ],
     },
     {
@@ -99,7 +104,6 @@ const Sidebar = () => {
       badge: pendingTransactionsCount,
       children: [
         { id: 'bank', path: '/transactions', label: 'Bank transactions', exact: true },
-        { id: 'payouts', path: '/economy/withdrawals', label: 'Host payout requests' },
       ],
     },
     {
@@ -109,6 +113,7 @@ const Sidebar = () => {
       children: [
         { id: 'ranks', path: '/leaderboard', label: 'Leaderboard & Rankings', exact: true },
         { id: 'geo', path: '/geo-analytics', label: 'Geography' },
+        { id: 'nearby', path: '/app/nearby', label: 'Nearby' },
       ],
     },
     {
@@ -144,11 +149,28 @@ const Sidebar = () => {
         { id: 'users-app', path: '/control/users', label: 'App accounts' },
         { id: 'live-config', path: '/control/live', label: 'Live room rules' },
         { id: 'notes', path: '/control/notifications', label: 'Notifications' },
+        { id: 'notification-switches', path: '/app/notification-switches', label: 'User notification switches' },
         { id: 'safety-config', path: '/control/safety', label: 'Safety' },
         { id: 'flags', path: '/control/features', label: 'Feature Flags' },
         { id: 'app-config', path: '/control/app', label: 'App Settings' },
         { id: 'roles', path: '/control/roles', label: 'Roles' },
         { id: 'history', path: '/control/history', label: 'Config History' },
+      ],
+    },
+    {
+      path: '/app/warnings',
+      icon: Smartphone,
+      label: 'User app',
+      children: [
+        { id: 'warnings', path: '/app/warnings', label: 'Warnings' },
+        { id: 'levels', path: '/app/levels', label: 'Levels' },
+        { id: 'referrals', path: '/app/referrals', label: 'Referrals' },
+        { id: 'blocks', path: '/app/blocks', label: 'Blocks' },
+        { id: 'private-chats', path: '/app/private-chats', label: 'Private chats' },
+        { id: 'kyc', path: '/app/kyc', label: 'KYC review' },
+        { id: 'host-performance', path: '/app/host-performance', label: 'Host performance' },
+        { id: 'coin-packs', path: '/app/coin-packs', label: 'Coin packs' },
+        { id: 'telegram', path: '/app/telegram', label: 'Telegram popup' },
       ],
     },
     { path: '/chamakz-team', icon: UsersRound, label: 'Team accounts' },
