@@ -2,7 +2,8 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import Panel from '../Panel'
-import { createEconomy, diamonds, getRange, inr, series, summarize } from '../../economy/data'
+import { diamonds, getRange, inr, series, summarize } from '../../economy/data'
+import { economyFromLive, useDataRevision } from '../../data/liveStore'
 
 const rangeFor = (preset, customStart, customEnd) => {
   if (preset === 'thisMonth') return getRange('month')
@@ -60,7 +61,8 @@ const Money = ({ label, value, note, tone }) => (
 )
 
 const EconomyPanel = ({ preset = '30d', customStart = '', customEnd = '' }) => {
-  const db = useMemo(() => createEconomy(), [])
+  const revision = useDataRevision()
+  const db = useMemo(() => economyFromLive(), [revision])
   const range = useMemo(() => rangeFor(preset, customStart, customEnd), [preset, customStart, customEnd])
   const review = useMemo(() => summarize(db, range), [db, range])
   const totals = useMemo(() => summarize(db, { start: new Date(0), end: new Date() }), [db])

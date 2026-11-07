@@ -1,3 +1,5 @@
+import { dataReady, liveRows } from '../data/liveStore'
+
 const minutesAgo = (mins) => new Date(Date.now() - mins * 60 * 1000)
 const hoursAgo = (hours) => new Date(Date.now() - hours * 60 * 60 * 1000)
 const daysAgo = (days) => new Date(Date.now() - days * 24 * 60 * 60 * 1000)
@@ -90,7 +92,7 @@ const clone = (row) => ({
   lastMessageAt: new Date(row.lastMessageAt),
 })
 
-export const listChats = () => directory
+export const listChats = () => (dataReady() ? liveRows('chats') : [])
   .map(clone)
   .sort((a, b) => b.lastMessageAt - a.lastMessageAt)
 

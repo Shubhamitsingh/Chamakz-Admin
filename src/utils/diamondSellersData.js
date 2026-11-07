@@ -1,3 +1,5 @@
+import { dataReady, liveRows } from '../data/liveStore'
+
 const hoursAgo = (hours) => new Date(Date.now() - hours * 60 * 60 * 1000)
 const daysAgo = (days, hour = 14) => {
   const date = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
@@ -318,7 +320,7 @@ export const setDefaultRates = (sellerPct) => {
   return getDefaultRates()
 }
 
-export const listDiamondSellers = () => directory.map(decorateSeller).sort((a, b) => b.updatedAt - a.updatedAt)
+export const listDiamondSellers = () => (dataReady() ? liveRows('sellers') : [])
 
 export const getDiamondSeller = (id) => {
   const row = directory.find((item) => item.id === id)
@@ -391,7 +393,7 @@ export const deleteDiamondSeller = (id) => {
   directory = directory.filter((row) => row.id !== id)
 }
 
-export const listRequests = () => requests.map((row) => {
+export const listRequests = () => [].map((row) => {
   const presence = userPresence(row.userId)
   return {
     ...cloneRequest(row),
@@ -442,7 +444,7 @@ export const setRequestStatus = (id, status) => {
   })
 }
 
-export const listPayouts = () => payouts.map((row) => ({
+export const listPayouts = () => [].map((row) => ({
   ...clonePayout(row),
   sellerName: sellerName(row.sellerId),
 })).sort((a, b) => b.createdAt - a.createdAt)

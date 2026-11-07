@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useState, useEffect } from 'react'
 import { mockData } from '../utils/mockData'
 import { onAuthChange, logoutAdmin } from '../firebase/auth'
+import { isSupabaseConfigured } from '../lib/supabase'
+import { dataError, dataReady, liveRows, loadAdminData, subscribeData } from '../data/liveStore'
 import { collection, query, where, onSnapshot, getDocs, limit, collectionGroup } from 'firebase/firestore'
 import { db } from '../firebase/config'
 
@@ -56,9 +58,28 @@ export const AppProvider = ({ children }) => {
     return () => unsubscribe()
   }, [])
 
+  useEffect(() => {
+    if (!user || !isSupabaseConfigured) return undefined
+    let cancelled = false
+    loadAdminData()
+    const unsubscribe = subscribeData(() => {
+      if (cancelled || !dataReady()) return
+      setOpenTicketsCount(liveRows('tickets').filter((row) => row.status === 'Open' || row.status === 'In Progress').length)
+      setNewUsersCount(liveRows('profiles').length)
+      setUnreadChatsCount(liveRows('chats').reduce((sum, row) => sum + Number(row.unread || 0), 0))
+      setPendingHostApplicationsCount(liveRows('hostApplications').filter((row) => row.status === 'Pending').length)
+      setPendingTransactionsCount(liveRows('withdrawals').filter((row) => row.status === 'Pending').length)
+      setNewFeedbackCount(liveRows('feedback').filter((row) => row.status === 'New').length)
+    })
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
+  }, [user])
+
   // Listen to new/unseen tickets count in real-time
   useEffect(() => {
-    if (!user) return // Only run when user is logged in
+    if (!user || isSupabaseConfigured) return
 
     // Get last seen timestamp from localStorage
     const getLastSeenTime = () => {
@@ -97,7 +118,7 @@ export const AppProvider = ({ children }) => {
 
   // Listen to new user registrations in real-time
   useEffect(() => {
-    if (!user) return
+    if (!user || isSupabaseConfigured) return
 
     const getLastSeenUsersTime = () => {
       const saved = localStorage.getItem('usersLastSeen')
@@ -129,7 +150,7 @@ export const AppProvider = ({ children }) => {
 
   // Listen to unread chat messages count in real-time
   useEffect(() => {
-    if (!user) {
+    if (!user || isSupabaseConfigured) {
       setUnreadChatsCount(0)
       return
     }
@@ -186,7 +207,7 @@ export const AppProvider = ({ children }) => {
 
   // Listen to pending host applications count in real-time
   useEffect(() => {
-    if (!user) {
+    if (!user || isSupabaseConfigured) {
       setPendingHostApplicationsCount(0)
       return
     }
@@ -252,7 +273,7 @@ export const AppProvider = ({ children }) => {
 
   // Listen to pending withdrawal requests count in real-time
   useEffect(() => {
-    if (!user) {
+    if (!user || isSupabaseConfigured) {
       setPendingTransactionsCount(0)
       return
     }
@@ -280,7 +301,7 @@ export const AppProvider = ({ children }) => {
 
   // Listen to new feedback count in real-time
   useEffect(() => {
-    if (!user) {
+    if (!user || isSupabaseConfigured) {
       setNewFeedbackCount(0)
       return
     }

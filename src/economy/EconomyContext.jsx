@@ -1,10 +1,12 @@
-import { createContext, useContext, useMemo, useState } from 'react'
-import { circulation, createEconomy, getRange, previousRange, series, summarize, trend } from './data'
+import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { circulation, getRange, previousRange, series, summarize, trend } from './data'
+import { economyFromLive, subscribeData } from '../data/liveStore'
 
 const EconomyContext = createContext(null)
 
 export const EconomyProvider = ({ children }) => {
-  const [db, setDb] = useState(() => createEconomy())
+  const [db, setDb] = useState(() => economyFromLive())
+  useEffect(() => subscribeData(() => setDb(economyFromLive())), [])
   const [preset, setPreset] = useState('30d')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')

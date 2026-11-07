@@ -7,6 +7,8 @@ import Loader from '../components/Loader'
 import SearchBar from '../components/SearchBar'
 import PageHeader from '../components/PageHeader'
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp } from 'firebase/firestore'
+import { isSupabaseConfigured } from '../lib/supabase'
+import { dataReady, liveRows, subscribeData } from '../data/liveStore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { db, storage } from '../firebase/config'
 
@@ -43,6 +45,27 @@ const Gifts = () => {
 
   // Fetch gifts from Firebase
   useEffect(() => {
+    if (isSupabaseConfigured) {
+      const apply = () => {
+        setGifts(liveRows('gifts').map((row) => ({
+          id: row.id,
+          name: row.name || '',
+          description: row.description || '',
+          category: row.category || 'general',
+          cost: row.cost_diamonds || 0,
+          image: row.image_path || '',
+          imageUrl: row.image_path || '',
+          isActive: row.is_active !== false,
+          priority: row.priority || 0,
+          usageCount: 0,
+          createdAt: row.created_at ? new Date(row.created_at) : new Date(),
+          updatedAt: row.updated_at ? new Date(row.updated_at) : new Date(),
+        })))
+        setLoading(!dataReady())
+      }
+      apply()
+      return subscribeData(apply)
+    }
     const unsubscribe = onSnapshot(
       query(collection(db, 'gifts'), orderBy('priority', 'desc')),
       (snapshot) => {

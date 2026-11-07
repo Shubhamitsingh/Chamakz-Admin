@@ -1,3 +1,5 @@
+import { dataReady, liveRows } from '../data/liveStore'
+
 const hoursAgo = (hours) => new Date(Date.now() - hours * 60 * 60 * 1000)
 const daysAgo = (days) => new Date(Date.now() - days * 24 * 60 * 60 * 1000)
 
@@ -379,7 +381,7 @@ export const resetComplaints = () => {
   directory = cloneList()
 }
 
-export const listComplaints = () => directory.map((item) => enrich(item))
+export const listComplaints = () => (dataReady() ? liveRows('complaints') : [])
 
 const enrich = (item) => {
   const against = directory.filter((row) => row.reported.id === item.reported.id)

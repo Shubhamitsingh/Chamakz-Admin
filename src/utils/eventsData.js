@@ -1,3 +1,5 @@
+import { dataReady, liveRows } from '../data/liveStore'
+
 const hoursAgo = (hours) => new Date(Date.now() - hours * 60 * 60 * 1000)
 const daysAgo = (days) => new Date(Date.now() - days * 24 * 60 * 60 * 1000)
 const daysFrom = (days) => new Date(Date.now() + days * 24 * 60 * 60 * 1000)
@@ -109,7 +111,7 @@ const clone = (row) => ({
   createdAt: new Date(row.createdAt),
 })
 
-export const listEvents = () => directory
+export const listEvents = () => (dataReady() ? liveRows('events') : [])
   .map(clone)
   .sort((a, b) => b.startAt - a.startAt)
 

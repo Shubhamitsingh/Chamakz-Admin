@@ -1,6 +1,8 @@
 const hoursAgo = (hours) => new Date(Date.now() - hours * 60 * 60 * 1000)
 const daysAgo = (days) => new Date(Date.now() - days * 24 * 60 * 60 * 1000)
 
+import { dataReady, liveRows } from '../data/liveStore'
+
 export const HOST_APP_STATUSES = ['Pending', 'Approved', 'Rejected']
 export const HOST_APP_CATEGORIES = ['Entertainment', 'Gaming', 'Music', 'Talk', 'Lifestyle']
 
@@ -108,9 +110,7 @@ const clone = (row) => ({
   reviewedAt: row.reviewedAt ? new Date(row.reviewedAt) : null,
 })
 
-export const listHostApplications = () => directory
-  .map(clone)
-  .sort((a, b) => b.appliedAt - a.appliedAt)
+export const listHostApplications = () => (dataReady() ? liveRows('hostApplications') : [])
 
 export const getHostApplication = (id) => {
   const row = directory.find((item) => item.id === id)

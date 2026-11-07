@@ -11,6 +11,7 @@ import KpiCard from '../components/KpiCard'
 import Modal from '../components/Modal'
 import ExportButton from '../components/ExportButton'
 import { useApp } from '../context/AppContext'
+import { useDataRevision } from '../data/liveStore'
 import {
   HOST_APP_CATEGORIES,
   HOST_APP_STATUSES,
@@ -30,6 +31,7 @@ const Avatar = ({ name }) => (
 
 const HostApplications = () => {
   const { showToast, markHostApplicationsAsSeen } = useApp()
+  const revision = useDataRevision()
   const [tick, setTick] = useState(0)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
@@ -42,7 +44,7 @@ const HostApplications = () => {
 
   useEffect(() => { markHostApplicationsAsSeen?.() }, [markHostApplicationsAsSeen])
 
-  const rows = useMemo(() => listHostApplications(), [tick])
+  const rows = useMemo(() => listHostApplications(), [tick, revision])
   const selected = selectedId ? getHostApplication(selectedId) : null
   const refresh = () => setTick((value) => value + 1)
 

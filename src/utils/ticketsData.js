@@ -1,6 +1,8 @@
 const hoursAgo = (hours) => new Date(Date.now() - hours * 60 * 60 * 1000)
 const daysAgo = (days) => new Date(Date.now() - days * 24 * 60 * 60 * 1000)
 
+import { dataReady, liveRows } from '../data/liveStore'
+
 export const TICKET_STATUSES = ['Open', 'In Progress', 'Waiting on User', 'Resolved', 'Closed']
 export const TICKET_PRIORITIES = ['Urgent', 'High', 'Medium', 'Low']
 export const TICKET_CATEGORIES = [
@@ -263,7 +265,7 @@ const cloneList = () => seed.map((item) => ({
 
 let directory = cloneList()
 
-export const listTickets = () => directory.map((item) => ({ ...item }))
+export const listTickets = () => (dataReady() ? liveRows('tickets') : [])
 
 export const getTicket = (id) => listTickets().find((item) => item.id === id) || null
 

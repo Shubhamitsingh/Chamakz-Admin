@@ -9,6 +9,7 @@ import EmptyState from '../components/EmptyState'
 import StatusBadge from '../components/StatusBadge'
 import Modal from '../components/Modal'
 import { useApp } from '../context/AppContext'
+import { useDataRevision } from '../data/liveStore'
 import {
   applyUserPatch,
   filterUsers,
@@ -33,6 +34,7 @@ const Users = () => {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { showToast, markUsersAsSeen } = useApp()
+  const revision = useDataRevision()
   const segment = USER_SEGMENTS.some((item) => item.id === segmentParam) ? segmentParam : 'all'
   const current = USER_SEGMENTS.find((item) => item.id === segment)
 
@@ -58,7 +60,7 @@ const Users = () => {
     markUsersAsSeen?.()
   }, [markUsersAsSeen])
 
-  const counts = useMemo(() => segmentCounts(), [tick])
+  const counts = useMemo(() => segmentCounts(), [tick, revision])
   const rows = useMemo(() => {
     const list = filterUsers({
       segment,
@@ -82,7 +84,7 @@ const Users = () => {
       if (av > bv) return sortDir === 'asc' ? 1 : -1
       return 0
     })
-  }, [segment, search, country, state, city, userType, status, verification, coinMin, coinMax, from, to, sortKey, sortDir, tick])
+  }, [segment, search, country, state, city, userType, status, verification, coinMin, coinMax, from, to, sortKey, sortDir, tick, revision])
 
   const totalPages = Math.max(1, Math.ceil(rows.length / perPage))
   const pageRows = rows.slice((page - 1) * perPage, page * perPage)

@@ -1,3 +1,5 @@
+import { dataReady, liveRows } from '../data/liveStore'
+
 const hoursAgo = (hours) => new Date(Date.now() - hours * 60 * 60 * 1000)
 const daysAgo = (days) => new Date(Date.now() - days * 24 * 60 * 60 * 1000)
 
@@ -424,7 +426,7 @@ const enrich = (item) => {
   }
 }
 
-export const listWithdrawals = () => directory.map(enrich)
+export const listWithdrawals = () => (dataReady() ? liveRows('withdrawals') : [])
 
 export const getWithdrawal = (id) => listWithdrawals().find((item) => item.id === id) || null
 

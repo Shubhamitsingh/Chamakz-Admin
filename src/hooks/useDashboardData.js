@@ -8,6 +8,8 @@ import {
 } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { checkFirebaseConnection } from '../firebase/healthCheck'
+import { isSupabaseConfigured } from '../lib/supabase'
+import { dataError, dataReady, liveRows, subscribeData } from '../data/liveStore'
 import {
   addDays,
   countBy,
@@ -132,6 +134,46 @@ export const useDashboardData = ({ preset, customStart, customEnd, countryFilter
   const compareRange = useMemo(() => previousRange(range.start, range.end), [range])
 
   useEffect(() => {
+    if (isSupabaseConfigured) {
+      const apply = () => {
+        const profiles = liveRows('profiles')
+        setUsers(profiles.map((user) => ({
+          id: user.id,
+          data: user,
+          name: user.name,
+          numericUserId: user.numericId,
+          photo: '',
+          createdAt: user.registeredAt,
+          lastActive: user.lastActive,
+          gender: user.gender,
+          country: user.country,
+          city: user.city,
+          region: user.state,
+          status: user.status,
+          verified: user.verification === 'Verified',
+          premium: user.vip,
+          platform: user.platform,
+          appVersion: user.appVersion,
+          isLive: false,
+          isHost: user.isHost,
+          coins: user.coins,
+        })))
+        setWithdrawals(liveRows('withdrawals'))
+        setComplaints(liveRows('complaints'))
+        setTickets(liveRows('tickets'))
+        setChats(liveRows('chats'))
+        setHostApps(liveRows('hostApplications'))
+        setGifts(liveRows('gifts'))
+        setLiveStreams(liveRows('liveSessions').filter((row) => row.status === 'live'))
+        setTransactions(liveRows('payments'))
+        setLoading(!dataReady())
+        setError(dataError() || null)
+        setHealth({ firebase: 'not-used', auth: 'supabase', mock: false, error: dataError() || null })
+        setLastUpdated(new Date())
+      }
+      apply()
+      return subscribeData(apply)
+    }
     if (!db) {
       setError('Firebase is not initialized')
       setLoading(false)

@@ -1,6 +1,8 @@
 # Chamak Admin Panel — System Documentation and Database Blueprint
 
-Status of this document: **inspection only**. No Supabase project, table, or connection was created. Existing mock data and screens were not changed.
+Status of this document: **inspection only**. No Supabase table was created and no mock screen was rewired.
+
+Supabase audit on 7 Nov 2026: the admin is connected to `https://senmhtoihjfpvcwdybve.supabase.co` (`project_ref` `senmhtoihjfpvcwdybve`). The public schema has no tables and no migrations. An earlier lookup hit a different project and is not the database to use. Nothing has been created there yet. See `CHAMAK_SUPABASE_INTEGRATION_STATUS.md`.
 
 Labels used below:
 

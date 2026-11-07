@@ -19,7 +19,8 @@ import GeoSnapshot from '../components/dashboard/GeoSnapshot'
 import ActivityHeatmap from '../components/dashboard/ActivityHeatmap'
 import { exportToCSV } from '../utils/exportUtils'
 import { formatCompact, timeAgo } from '../utils/dashboardFields'
-import { createEconomy, inr, summarize } from '../economy/data'
+import { inr, summarize } from '../economy/data'
+import { economyFromLive, useDataRevision } from '../data/liveStore'
 
 const DATE_PRESETS = [
   { id: 'today', label: 'Today' },
@@ -42,7 +43,8 @@ const Dashboard = () => {
   const [fullscreen, setFullscreen] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
 
-  const economyTotals = useMemo(() => summarize(createEconomy(), { start: new Date(0), end: new Date() }), [])
+  const revision = useDataRevision()
+  const economyTotals = useMemo(() => summarize(economyFromLive(), { start: new Date(0), end: new Date() }), [revision])
 
   const { loading, error, health, availability, lastUpdated, metrics } = useDashboardData({
     preset,

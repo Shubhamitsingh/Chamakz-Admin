@@ -1,6 +1,8 @@
 const hoursAgo = (hours) => new Date(Date.now() - hours * 60 * 60 * 1000)
 const daysAgo = (days) => new Date(Date.now() - days * 24 * 60 * 60 * 1000)
 
+import { dataReady, liveRows } from '../data/liveStore'
+
 export const FB_STATUSES = ['New', 'Reviewed', 'Actioned', 'Archived']
 export const FB_CATEGORIES = [
   'Live Streaming',
@@ -286,7 +288,7 @@ const cloneList = () => seed.map((row) => ({
 
 let directory = cloneList()
 
-export const listFeedback = () => directory.map((row) => ({ ...row }))
+export const listFeedback = () => (dataReady() ? liveRows('feedback') : [])
 
 export const getFeedback = (id) => listFeedback().find((row) => row.id === id) || null
 
