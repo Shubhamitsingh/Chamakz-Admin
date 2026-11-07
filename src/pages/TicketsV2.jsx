@@ -226,7 +226,7 @@ const TicketsV2 = () => {
             <KpiCard title={card.title} value={card.value} icon={card.icon} tone={card.tone} />
           </button>
         ))}
-      </div>
+        </div>
 
       <Panel padded={false}>
         <div className="flex flex-wrap gap-2 p-3">
@@ -357,7 +357,7 @@ const TicketsV2 = () => {
                   <div className="mt-3 space-y-2">
                     <textarea className="input-field min-h-[72px]" placeholder="Reply to user (sample only)" value={reply} onChange={(e) => setReply(e.target.value)} />
                     <button type="button" className="rounded-md bg-gray-900 px-3 py-1.5 text-xs text-white" onClick={() => sendReply(false)}>Send reply</button>
-                  </div>
+              </div>
                 )}
               </Panel>
 
@@ -373,7 +373,7 @@ const TicketsV2 = () => {
                   <div className="mt-2 space-y-2">
                     <textarea className="input-field min-h-[56px]" placeholder="Internal note (not visible to user)" value={note} onChange={(e) => setNote(e.target.value)} />
                     <button type="button" className="rounded-md border px-3 py-1.5 text-xs" onClick={() => sendReply(true)}>Add note</button>
-                  </div>
+            </div>
                 )}
               </Panel>
 
@@ -388,7 +388,7 @@ const TicketsV2 = () => {
                     </>
                   )}
                   <Link to={`/users/profile/${selected.user.id}`} className="rounded-md border px-2.5 py-1.5 text-[11px]">View profile</Link>
-                </div>
+              </div>
                 {selected.status === 'Closed' && <p className="mt-2 text-xs text-gray-500">Closed tickets are read-only in this sample.</p>}
               </Panel>
 
@@ -405,8 +405,8 @@ const TicketsV2 = () => {
               </Panel>
             </div>
           </aside>
-        </div>
-      )}
+              </div>
+            )}
 
       <Modal isOpen={Boolean(confirm)} onClose={() => setConfirm(null)} title="Confirm sample action" size="sm">
         {confirm?.kind === 'assign' && (

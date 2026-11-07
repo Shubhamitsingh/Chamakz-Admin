@@ -21,6 +21,8 @@ import {
   AlertTriangle,
   MapPin,
   Gem,
+  Video,
+  Trophy,
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { USER_ANALYTICS_PATH, USER_SEGMENTS } from '../utils/userManagementData'
@@ -52,6 +54,8 @@ const Sidebar = () => {
 
   const menuItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { path: '/live-streaming', icon: Video, label: 'Live Streaming' },
+    { path: '/leaderboard', icon: Trophy, label: 'Leaderboard & Rankings' },
     { path: '/geo-analytics', icon: MapPin, label: 'Geography' },
     {
       path: '/users',
@@ -123,12 +127,12 @@ const Sidebar = () => {
               return (
                 <div key={index}>
                   {item.children ? (
-                    <div className={`flex items-center mx-2 mb-0.5 rounded-lg ${parentActive && !sidebarOpen ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : ''}`}>
+                    <div className={`flex items-center mx-2 mb-0.5 rounded-lg ${parentActive && !sidebarOpen ? 'bg-pink-500 text-white' : ''}`}>
                       <NavLink
                         to={item.path}
                         className={`flex flex-1 items-center gap-2.5 px-3 py-2 rounded-lg transition-all relative ${
                           parentActive && !item.children
-                            ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                            ? 'bg-pink-500 text-white'
                             : parentActive
                               ? 'text-gray-900 dark:text-white'
                               : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/60'
@@ -165,7 +169,7 @@ const Sidebar = () => {
                       className={({ isActive }) =>
                         `flex items-center gap-2.5 px-3 py-2 mx-2 rounded-lg transition-all mb-0.5 relative ${
                           isActive
-                            ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                            ? 'bg-pink-500 text-white'
                             : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/60'
                         }`
                       }
@@ -195,7 +199,7 @@ const Sidebar = () => {
                           className={({ isActive }) =>
                             `block truncate rounded-md px-2 py-1 text-[11px] ${
                               isActive
-                                ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                                ? 'bg-pink-500 text-white'
                                 : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700/60'
                             }`
                           }

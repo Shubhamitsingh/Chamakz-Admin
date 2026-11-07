@@ -114,12 +114,12 @@ const HostApplications = () => {
         <button type="button" onClick={() => setStatus('Pending')}><KpiCard title="Pending" value={counts.Pending} icon={Clock} tone="amber" /></button>
         <button type="button" onClick={() => setStatus('Approved')}><KpiCard title="Approved" value={counts.Approved} icon={CheckCircle} tone="emerald" /></button>
         <button type="button" onClick={() => setStatus('Rejected')}><KpiCard title="Rejected" value={counts.Rejected} icon={UserX} tone="rose" /></button>
-      </div>
+            </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <SearchBar placeholder="Search name, ID, email, or reason" value={search} onChange={setSearch} />
         {['all', ...HOST_APP_STATUSES].map((item) => (
-          <button key={item} type="button" className={`rounded-full px-3 py-1 text-xs ${status === item ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'bg-white ring-1 ring-gray-200 dark:bg-gray-800'}`} onClick={() => setStatus(item)}>
+          <button key={item} type="button" className={`rounded-full px-3 py-1 text-xs ${status === item ? 'bg-pink-500 text-white' : 'bg-white ring-1 ring-gray-200 dark:bg-gray-800'}`} onClick={() => setStatus(item)}>
             {item === 'all' ? 'All' : item}
           </button>
         ))}
@@ -150,11 +150,11 @@ const HostApplications = () => {
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2">
                         <Avatar name={row.user.name} />
-                        <div>
+          <div>
                           <p className="font-medium">{row.user.name}</p>
                           <p className="font-mono text-[11px] text-gray-400">{row.user.numericId} · {row.user.city}</p>
-                        </div>
-                      </div>
+          </div>
+        </div>
                     </td>
                     <td className="px-4 py-2.5 text-xs">{row.category}</td>
                     <td className="px-4 py-2.5"><StatusBadge tone={statusTone(row.status)}>{row.status}</StatusBadge></td>
@@ -168,14 +168,14 @@ const HostApplications = () => {
                             <button type="button" className="rounded-md bg-rose-600 px-2 py-1 text-[11px] text-white" onClick={() => { setConfirm({ id: row.id, action: 'reject' }); setNote('') }}>Reject</button>
                           </>
                         )}
-                      </div>
+            </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
-        )}
+        </div>
+      )}
       </Panel>
 
       <Pagination currentPage={page} totalPages={totalPages} totalItems={filtered.length} itemsPerPage={perPage} onPageChange={setPage} onItemsPerPageChange={(value) => { setPerPage(value); setPage(1) }} />
@@ -185,7 +185,7 @@ const HostApplications = () => {
           <button type="button" className="absolute inset-0 bg-black/30" aria-label="Close" onClick={() => setSelectedId(null)} />
           <aside className="relative z-50 flex h-full w-full max-w-lg flex-col overflow-y-auto border-l border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
             <div className="flex items-start justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-              <div>
+            <div>
                 <p className="font-mono text-[11px] text-gray-400">{selected.id}</p>
                 <h2 className="text-base font-semibold">{selected.user.name}</h2>
                 <p className="text-xs text-gray-500">{selected.category} · {formatWhen(selected.appliedAt)}</p>
@@ -227,8 +227,8 @@ const HostApplications = () => {
                 <div className="flex gap-2">
                   <button type="button" className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs text-white" onClick={() => { setConfirm({ id: selected.id, action: 'approve' }); setNote('') }}>Approve</button>
                   <button type="button" className="rounded-md bg-rose-600 px-3 py-1.5 text-xs text-white" onClick={() => { setConfirm({ id: selected.id, action: 'reject' }); setNote('') }}>Reject</button>
-                </div>
-              )}
+          </div>
+        )}
             </div>
           </aside>
         </div>

@@ -184,7 +184,7 @@ const ChamakzTeam = () => {
       <div className="flex flex-wrap items-center gap-2">
         <SearchBar placeholder="Search notices" value={search} onChange={setSearch} />
         {['all', ...TEAM_AUDIENCES].map((item) => (
-          <button key={item} type="button" className={`rounded-full px-3 py-1 text-xs ${audienceFilter === item ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'bg-white ring-1 ring-gray-200 dark:bg-gray-800'}`} onClick={() => setAudienceFilter(item)}>
+          <button key={item} type="button" className={`rounded-full px-3 py-1 text-xs ${audienceFilter === item ? 'bg-pink-500 text-white' : 'bg-white ring-1 ring-gray-200 dark:bg-gray-800'}`} onClick={() => setAudienceFilter(item)}>
             {item === 'all' ? 'All audiences' : item}
           </button>
         ))}

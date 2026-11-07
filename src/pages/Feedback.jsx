@@ -144,7 +144,7 @@ const Feedback = () => {
                 aria-label={insights.mood.label}
               >
                 {insights.mood.emoji}
-              </motion.div>
+        </motion.div>
             </AnimatePresence>
             <div className="min-w-0">
               <p className={`text-[10px] font-semibold uppercase tracking-[0.14em] ${theme.kicker}`}>Satisfaction</p>
@@ -153,7 +153,7 @@ const Feedback = () => {
                 <span className="ml-1 text-sm font-medium text-gray-400">/ 5</span>
               </p>
               <p className={`mt-1 text-sm font-medium ${theme.label}`}>{insights.mood.label}</p>
-            </div>
+          </div>
           </div>
           <div className="grid min-h-[5.5rem] flex-1 grid-cols-5">
             {[
@@ -191,7 +191,7 @@ const Feedback = () => {
                 <span className="w-16 text-gray-500">{item.star}★</span>
                 <div className={`h-2 flex-1 overflow-hidden rounded-full ${item.track}`}>
                   <div className={`h-full rounded-full ${item.bar} ${starFilter === item.star ? 'opacity-100' : 'opacity-85'}`} style={{ width: `${Math.max(item.pct, item.count ? 4 : 0)}%` }} />
-                </div>
+        </div>
                 <span className="w-16 text-right tabular-nums text-gray-600">{item.count} · {item.pct}%</span>
               </button>
             </li>
@@ -208,7 +208,7 @@ const Feedback = () => {
           <option value="submittedAt">Newest</option>
           <option value="rating">Highest rating</option>
         </select>
-      </div>
+        </div>
 
       {pageRows.length === 0 ? (
         <EmptyState title="No voices match these filters" description="Reset filters to see the full sample inbox." />
@@ -223,12 +223,12 @@ const Feedback = () => {
                   <Avatar name={row.user.name} tone={tone.avatar} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
-                      <div>
+              <div>
                         <p className="font-medium">{row.user.name}</p>
                         <p className="font-mono text-[11px] text-gray-400">{row.user.numericId}</p>
                       </div>
                       <span className="text-2xl leading-none" title={mood.label}>{mood.emoji}</span>
-                    </div>
+              </div>
                     <p className={`mt-1 text-xs ${tone.stars}`}><Stars value={row.rating} /> · {mood.label}</p>
                     <p className="mt-1 text-[11px] text-gray-500">{row.category} · {row.type}</p>
                   </div>
@@ -243,8 +243,8 @@ const Feedback = () => {
               </article>
             )
           })}
-        </div>
-      )}
+                  </div>
+                )}
 
       <Pagination currentPage={page} totalPages={totalPages} totalItems={filtered.length} itemsPerPage={perPage} onPageChange={setPage} onItemsPerPageChange={(value) => { setPerPage(value); setPage(1) }} />
 
@@ -253,7 +253,7 @@ const Feedback = () => {
           <button type="button" className="absolute inset-0 bg-black/30" aria-label="Close" onClick={() => setSelectedId(null)} />
           <aside className="relative z-50 flex h-full w-full max-w-lg flex-col overflow-y-auto border-l border-slate-200 bg-white dark:border-gray-700 dark:bg-gray-800">
             <div className={`flex items-start justify-between px-4 py-4 text-white ${ratingTone(selected.rating).header}`}>
-              <div>
+                <div>
                 <p className="font-mono text-[11px] text-white/80">{selected.id}</p>
                 <p className="text-3xl leading-none">{emojiForRating(selected.rating).emoji}</p>
                 <h2 className="mt-1 text-base font-semibold">{selected.subject}</h2>
@@ -265,7 +265,7 @@ const Feedback = () => {
               <p className={`rounded-xl p-4 text-sm leading-relaxed ${ratingTone(selected.rating).quote}`}>“{selected.message}”</p>
               <div className="flex items-center gap-3">
                 <Avatar name={selected.user.name} tone={ratingTone(selected.rating).avatar} />
-                <div>
+            <div>
                   <p className="font-medium">{selected.user.name}</p>
                   <p className="font-mono text-[11px] text-gray-500">{selected.user.numericId}</p>
                   <p className="text-xs">{selected.user.email}</p>
@@ -274,7 +274,7 @@ const Feedback = () => {
               <p className="text-xs text-gray-500">{selected.category} · {selected.type} · {selected.platform} {selected.appVersion} · {formatWhen(selected.submittedAt)}</p>
               <Link className={`inline-block text-xs font-medium ${theme.link}`} to={`/users/profile/${selected.user.id}`}>Open user profile</Link>
               <textarea className="input-field min-h-[64px]" placeholder="Private admin note — not sent to the user" value={note} onChange={(e) => setNote(e.target.value)} />
-              <button
+              <button 
                 type="button"
                 className={`rounded-full px-3 py-1.5 text-xs text-white ${theme.btn}`}
                 onClick={() => {

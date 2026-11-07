@@ -53,7 +53,7 @@ const UserAnalytics = () => {
             onClick={() => setPreset(item.id)}
             className={`rounded-md border px-3 py-1.5 text-xs font-medium ${
               preset === item.id
-                ? 'border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900'
+                ? 'border-pink-500 bg-pink-500 text-white'
                 : 'border-gray-200 hover:bg-gray-50 dark:border-gray-700'
             }`}
           >

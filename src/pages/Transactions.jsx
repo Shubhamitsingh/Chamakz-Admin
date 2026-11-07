@@ -339,8 +339,8 @@ const Transactions = () => {
         description="Company bank transfers only. Sample queue — this screen never sends money or connects to a bank."
         actions={
           <div className="flex gap-1">
-            <button type="button" className={`rounded-md px-3 py-1.5 text-xs ${tab === 'requests' ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'border'}`} onClick={() => setTab('requests')}>Requests</button>
-            <button type="button" className={`rounded-md px-3 py-1.5 text-xs ${tab === 'reports' ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'border'}`} onClick={() => setTab('reports')}>Reports</button>
+            <button type="button" className={`rounded-md px-3 py-1.5 text-xs ${tab === 'requests' ? 'bg-pink-500 text-white' : 'border'}`} onClick={() => setTab('requests')}>Requests</button>
+            <button type="button" className={`rounded-md px-3 py-1.5 text-xs ${tab === 'reports' ? 'bg-pink-500 text-white' : 'border'}`} onClick={() => setTab('reports')}>Reports</button>
           </div>
         }
       />
@@ -349,7 +349,7 @@ const Transactions = () => {
         <div className="space-y-3">
           <div className="flex flex-wrap gap-2">
             {[{ id: 'today', label: 'Today' }, { id: '7d', label: 'Last 7 days' }, { id: '30d', label: 'Last 30 days' }, { id: 'month', label: 'This month' }, { id: 'custom', label: 'Custom' }].map((item) => (
-              <button key={item.id} type="button" className={`rounded-md border px-3 py-1.5 text-xs ${reportPreset === item.id ? 'border-gray-900 bg-gray-900 text-white' : ''}`} onClick={() => setReportPreset(item.id)}>{item.label}</button>
+              <button key={item.id} type="button" className={`rounded-md border px-3 py-1.5 text-xs ${reportPreset === item.id ? 'border-pink-500 bg-pink-500 text-white' : ''}`} onClick={() => setReportPreset(item.id)}>{item.label}</button>
             ))}
             {reportPreset === 'custom' && (
               <>
@@ -367,7 +367,7 @@ const Transactions = () => {
             <KpiCard title="Successful payouts" value={finance.payouts} tone="indigo" />
             <KpiCard title="Average paid" value={inr(finance.average)} tone="teal" />
           </div>
-        </div>
+          </div>
       ) : (
         <>
           <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-7">
@@ -399,7 +399,7 @@ const Transactions = () => {
               <input className="input-field max-w-[140px]" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
               <input className="input-field max-w-[140px]" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
               <ExportButton data={exportRows} columns={exportColumns} filename="withdrawals" disabled={exportRows.length === 0} />
-            </div>
+          </div>
             {pageRows.length === 0 ? (
               <EmptyState title="No withdrawal requests" description="Try another status card or clear filters." />
             ) : (
@@ -427,11 +427,11 @@ const Transactions = () => {
                         <td className="px-3 py-2">
                           <div className="flex items-center gap-2">
                             <Avatar name={row.host.name} />
-                            <div>
+          <div>
                               <p className="font-medium">{row.host.name}</p>
                               <StatusBadge tone={statusTone(row.bank.status)}>{row.bank.status}</StatusBadge>
-                            </div>
-                          </div>
+          </div>
+        </div>
                         </td>
                         <td className="px-3 py-2 font-mono text-[11px]">{row.host.numericId}</td>
                         <td className="px-3 py-2 tabular-nums">{row.coins.toLocaleString()}</td>
@@ -464,8 +464,8 @@ const Transactions = () => {
               <Pagination currentPage={page} totalPages={totalPages} totalItems={filtered.length} itemsPerPage={perPage} onPageChange={setPage} onItemsPerPageChange={(value) => { setPerPage(value); setPage(1) }} />
             </div>
           </Panel>
-        </>
-      )}
+          </>
+        )}
 
       {selected && (
         <div className="fixed inset-0 z-40 flex justify-end">
@@ -500,7 +500,7 @@ const Transactions = () => {
               <Panel title="Host">
                 <div className="flex items-center gap-2">
                   <Avatar name={selected.host.name} />
-                  <div>
+                <div>
                     <p className="text-sm font-medium">{selected.host.name}</p>
                     <p className="font-mono text-[11px] text-gray-500">{selected.host.numericId}</p>
                   </div>
@@ -547,8 +547,8 @@ const Transactions = () => {
                         {revealAccount ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
                         {revealAccount ? 'Hide' : 'Reveal'}
                       </button>
-                    </div>
-                  </div>
+              </div>
+            </div>
                   <Field label="IFSC">{selected.bank.ifsc}</Field>
                   <Field label="Branch">{selected.bank.branch || 'Not provided'}</Field>
                   <Field label="Account type">{selected.bank.accountType || 'Not provided'}</Field>
@@ -600,7 +600,7 @@ const Transactions = () => {
                     {selected.payNote && <p className="mt-2">{selected.payNote}</p>}
                     {selected.proofUrl ? <img src={selected.proofUrl} alt="" className="mt-2 max-h-32 rounded-md" /> : null}
                     <p className="mt-1 text-gray-500">Completed payout is read-only in this sample.</p>
-                  </div>
+                    </div>
                 </Panel>
               )}
               {selected.status === 'Rejected' && <p className="text-xs text-red-700">Rejected: {selected.rejectReason}</p>}
@@ -625,7 +625,7 @@ const Transactions = () => {
                       <div className="flex gap-2">
                         <button type="button" className="text-indigo-600" onClick={() => document.querySelector('input[type=file]')?.click()}>Replace</button>
                         <button type="button" className="text-red-600" onClick={() => { setFile(null); setPreview('') }}>Remove</button>
-                      </div>
+                    </div>
                     )}
                     <button type="button" className="rounded-md bg-gray-900 px-3 py-1.5 text-white" onClick={() => setConfirm({ kind: 'paid', id: selected.id })}>Mark payment as completed</button>
                   </div>
@@ -683,10 +683,10 @@ const Transactions = () => {
                   </ul>
                 )}
               </Panel>
-            </div>
+              </div>
           </aside>
-        </div>
-      )}
+              </div>
+            )}
 
       <Modal isOpen={Boolean(confirm)} onClose={() => setConfirm(null)} title="Confirm sample action" size="sm">
         {confirm?.kind === 'approve' && confirmRow && (
@@ -695,8 +695,8 @@ const Transactions = () => {
             <p>{confirmRow.coins.toLocaleString()} coins · {inr(confirmRow.payable)}</p>
             <p>{confirmRow.bank.bankName} · {maskAccount(confirmRow.bank.account)} · {confirmRow.bank.ifsc}</p>
             {!canApproveWithdrawal(confirmRow) && <p className="text-xs text-red-700">Bank is {confirmRow.bank.status}. Approval is blocked.</p>}
-          </div>
-        )}
+                </div>
+              )}
         {confirm?.kind === 'paid' && (
           <div className="space-y-1 text-sm">
             <p>Amount {paidAmount ? inr(paidAmount) : 'missing'} · {PAYMENT_METHOD}</p>
@@ -713,14 +713,14 @@ const Transactions = () => {
         {confirm?.kind === 'bank-resubmit' && <p className="text-sm">Updated details stay pending verification. They are not auto-verified.</p>}
         <div className="mt-4 flex justify-end gap-2">
           <button type="button" className="rounded-md border px-3 py-1.5 text-xs" onClick={() => setConfirm(null)}>Cancel</button>
-          <button
+            <button
             type="button"
             className="rounded-md bg-gray-900 px-3 py-1.5 text-xs text-white disabled:opacity-40"
             disabled={confirm?.kind === 'approve' && confirmRow && !canApproveWithdrawal(confirmRow)}
             onClick={() => run(confirm.kind, confirm.id)}
           >
             Confirm
-          </button>
+            </button>
         </div>
       </Modal>
     </div>

@@ -1,7 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import {
-  Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
-} from 'recharts'
 import { Gem, Plus, X } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
 import Panel from '../components/Panel'
@@ -12,6 +9,7 @@ import StatusBadge from '../components/StatusBadge'
 import KpiCard from '../components/KpiCard'
 import Modal from '../components/Modal'
 import ExportButton from '../components/ExportButton'
+import SellerAnalyticsCharts from '../components/seller/SellerAnalyticsCharts'
 import { useApp } from '../context/AppContext'
 import {
   PAYOUT_STATUSES,
@@ -63,6 +61,7 @@ const RANGE = [
   { id: 'today', label: 'Today' },
   { id: '7d', label: 'Last 7 days' },
   { id: '30d', label: 'Last 30 days' },
+  { id: '90d', label: 'Last 90 days' },
   { id: 'month', label: 'This month' },
   { id: 'all', label: 'All time' },
   { id: 'custom', label: 'Custom' },
@@ -75,7 +74,7 @@ const Avatar = ({ name }) => (
 )
 
 const Chip = ({ active, onClick, children }) => (
-  <button type="button" className={`rounded-full px-3 py-1 text-xs ${active ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'bg-white ring-1 ring-gray-200 dark:bg-gray-800'}`} onClick={onClick}>
+  <button type="button" className={`rounded-full px-3 py-1 text-xs ${active ? 'bg-pink-500 text-white' : 'bg-white ring-1 ring-gray-200 dark:bg-gray-800'}`} onClick={onClick}>
     {children}
   </button>
 )
@@ -137,6 +136,7 @@ const DiamondSellers = () => {
   const [reqTo, setReqTo] = useState('')
   const [reqPage, setReqPage] = useState(1)
   const [range, setRange] = useState('all')
+  const [grain, setGrain] = useState('daily')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
   const [defaultPct, setDefaultPct] = useState(String(getDefaultRates().sellerPct))
@@ -192,7 +192,13 @@ const DiamondSellers = () => {
     })
   }, [requests, reqSearch, reqStatus, reqSeller, reqPresence, reqMin, reqMax, reqFrom, reqTo])
 
-  const analytics = useMemo(() => analyticsView(range, customFrom, customTo), [tick, range, customFrom, customTo])
+  const analytics = useMemo(() => {
+    try {
+      return analyticsView(range, customFrom, customTo, grain)
+    } catch (err) {
+      return { error: err.message || 'Could not build seller charts' }
+    }
+  }, [tick, range, customFrom, customTo, grain])
 
   useEffect(() => { setPage(1) }, [search, sellerFilter, sortKey])
   useEffect(() => { setReqPage(1) }, [reqSearch, reqStatus, reqSeller, reqPresence, reqMin, reqMax, reqFrom, reqTo])
@@ -373,7 +379,7 @@ const DiamondSellers = () => {
         actions={
           <div className="flex flex-wrap gap-1">
             {TABS.map((item) => (
-              <button key={item.id} type="button" className={`rounded-md px-3 py-1.5 text-xs ${tab === item.id ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'ring-1 ring-gray-200'}`} onClick={() => setTab(item.id)}>{item.label}</button>
+              <button key={item.id} type="button" className={`rounded-md px-3 py-1.5 text-xs ${tab === item.id ? 'bg-pink-500 text-white' : 'ring-1 ring-gray-200'}`} onClick={() => setTab(item.id)}>{item.label}</button>
             ))}
             <button type="button" className="inline-flex items-center gap-1 rounded-md bg-cyan-700 px-3 py-1.5 text-xs font-medium text-white" onClick={openCreate}>
               <Plus className="h-3.5 w-3.5" /> Add Diamond Seller
@@ -649,49 +655,23 @@ const DiamondSellers = () => {
               </>
             )}
           </div>
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-            <KpiCard title="Requests in range" value={analytics.metrics.total} tone="sky" />
-            <KpiCard title="Acceptance rate" value={`${analytics.metrics.acceptanceRate}%`} tone="indigo" />
-            <KpiCard title="Completion rate" value={`${analytics.metrics.completionRate}%`} tone="emerald" />
-            <KpiCard title="Average request" value={inr(analytics.metrics.averageAmount)} tone="amber" />
-            <KpiCard title="Completed value" value={inr(analytics.metrics.completedAmount)} tone="teal" />
-            <KpiCard title={`Seller commission (${SELLER_COMMISSION_PCT}%)`} value={inr(analytics.metrics.sellerCommission)} tone="pink" />
-            <KpiCard title="Company share (95%)" value={inr(analytics.metrics.companyCommission)} tone="blue" />
-            <KpiCard title="Accepted value" value={inr(analytics.metrics.acceptedAmount)} tone="violet" />
-          </div>
-          <div className="grid gap-3 lg:grid-cols-2">
-            <Panel title="Request trend">
-              <div className="h-56">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={analytics.trend}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip />
-                    <Bar dataKey="requests" fill="#0891b2" radius={4} />
-                  </BarChart>
-                </ResponsiveContainer>
+          {analytics.error ? (
+            <EmptyState title="Charts unavailable" description={analytics.error} />
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                <KpiCard title="Requests in range" value={analytics.metrics.total} tone="sky" sparkline={analytics.trend.map((row) => row.requests)} />
+                <KpiCard title="Acceptance rate" value={`${analytics.metrics.acceptanceRate}%`} tone="indigo" sparkline={analytics.trend.map((row) => row.accepted)} />
+                <KpiCard title="Completion rate" value={`${analytics.metrics.completionRate}%`} tone="blue" sparkline={analytics.trend.map((row) => row.completedValue)} />
+                <KpiCard title="Average request" value={inr(analytics.metrics.averageAmount)} tone="sky" />
+                <KpiCard title="Completed value" value={inr(analytics.metrics.completedAmount)} tone="blue" sparkline={analytics.trend.map((row) => row.completedValue)} />
+                <KpiCard title={`Seller commission (${SELLER_COMMISSION_PCT}%)`} value={inr(analytics.metrics.sellerCommission)} tone="sky" />
+                <KpiCard title="Company share (95%)" value={inr(analytics.metrics.companyCommission)} tone="blue" />
+                <KpiCard title="Accepted value" value={inr(analytics.metrics.acceptedAmount)} tone="indigo" sparkline={analytics.trend.map((row) => row.acceptedAmount)} />
               </div>
-            </Panel>
-            <Panel title="Completed transaction value">
-              <div className="h-56">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={analytics.trend}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip />
-                    <Area dataKey="completedValue" stroke="#059669" fill="#a7f3d0" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </Panel>
-          </div>
-          <div className="grid gap-3 md:grid-cols-3">
-            <Panel title="Top completed value">{analytics.topCompleted.map((row) => <p key={row.sellerId} className="flex justify-between py-1 text-sm"><span>{row.sellerName}</span><span>{inr(row.completedAmount)}</span></p>)}</Panel>
-            <Panel title="Most accepted requests">{analytics.topAccepted.map((row) => <p key={row.sellerId} className="flex justify-between py-1 text-sm"><span>{row.sellerName}</span><span>{row.accepted}</span></p>)}</Panel>
-            <Panel title="Highest commission earned">{analytics.topCommission.map((row) => <p key={row.sellerId} className="flex justify-between py-1 text-sm"><span>{row.sellerName}</span><span>{inr(row.sellerCommission)}</span></p>)}</Panel>
-          </div>
+              <SellerAnalyticsCharts analytics={analytics} grain={grain} onGrain={setGrain} />
+            </>
+          )}
         </div>
       )}
 

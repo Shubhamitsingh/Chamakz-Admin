@@ -111,7 +111,7 @@ const Chats = () => {
                   <button
                     key={item.id}
                     type="button"
-                    className={`rounded-full px-2.5 py-1 text-[11px] ${filter === item.id ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'bg-gray-100 dark:bg-gray-700'}`}
+                    className={`rounded-full px-2.5 py-1 text-[11px] ${filter === item.id ? 'bg-pink-500 text-white' : 'bg-gray-100 dark:bg-gray-700'}`}
                     onClick={() => setFilter(item.id)}
                   >
                     {item.label} {counts[item.id]}

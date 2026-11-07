@@ -34,6 +34,19 @@ import {
 const ONLINE_WINDOW_MS = 5 * 60 * 1000
 const ACTIVE_WINDOW_MS = 24 * 60 * 60 * 1000
 
+const buildActivityHeatmap = (users, range) => {
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const slots = ['12a', '4a', '8a', '12p', '4p', '8p']
+  const cells = days.map((day) => slots.map((slot) => ({ day, slot, count: 0 })))
+  users.forEach((user) => {
+    if (!user.lastActive || !inRange(user.lastActive, range.start, range.end)) return
+    const stamp = new Date(user.lastActive)
+    const slot = Math.min(5, Math.floor(stamp.getHours() / 4))
+    cells[stamp.getDay()][slot].count += 1
+  })
+  return { days, slots, cells }
+}
+
 const emptyAvailability = {
   gender: false,
   location: false,
@@ -86,6 +99,7 @@ const mapStreamDoc = (id, data, collectionName) => {
     gifts: Number(data.giftsReceived || data.totalGifts || data.giftCount || 0),
     coinsPerMinute: Number(data.coinsPerMinute || data.coins_per_minute || 0),
     totalCoinsEarned: Number(data.totalCoinsEarned || data.total_coins_earned || 0),
+    playbackUrl: data.playbackUrl || data.streamUrl || data.hlsUrl || data.liveUrl || '',
     startTime,
     status: data.status || 'live',
     collection: collectionName,
@@ -458,6 +472,17 @@ export const useDashboardData = ({ preset, customStart, customEnd, countryFilter
       }
     })
 
+    const liveSeries = activitySeries.map((point, index) => {
+      const day = addDays(startOfDay(range.end), -(activitySeries.length - 1 - index))
+      const dayStreams = liveStreams.filter((stream) => inRange(stream.startTime, day, endOfDay(day)))
+      return {
+        name: point.name,
+        viewers: dayStreams.reduce((sum, stream) => sum + (stream.viewCount || 0), 0),
+        gifts: dayStreams.reduce((sum, stream) => sum + (stream.gifts || 0), 0),
+        rooms: dayStreams.length,
+      }
+    })
+
     const pendingWithdrawals = withdrawals.filter((item) =>
       ['pending', 'processing'].includes(String(item.status || '').toLowerCase())
     )
@@ -614,8 +639,12 @@ export const useDashboardData = ({ preset, customStart, customEnd, countryFilter
       hosts: filteredUsers.filter((user) => user.isHost).length,
       activeHosts: activeHosts.length,
       sparkline,
+      activeSparkline: activitySeries.map((point) => point.active),
+      revenueSparkline: revenueSeries.map((point) => point.revenue),
+      activityHeatmap: buildActivityHeatmap(filteredUsers, range),
       activitySeries,
       revenueSeries,
+      liveSeries,
       countries,
       cities,
       platforms,
@@ -625,6 +654,12 @@ export const useDashboardData = ({ preset, customStart, customEnd, countryFilter
       activity: richerActivity,
       liveViewers,
       liveRooms: liveStreams.length,
+      hostDirectory: filteredUsers.map((user) => ({
+        id: user.id,
+        name: user.name,
+        numericUserId: String(user.numericUserId || ''),
+        isLive: Boolean(user.isLive),
+      })),
       topLiveByViewers: [...liveStreams].sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0)).slice(0, 5),
       topLiveByGifts: [...liveStreams].sort((a, b) => (b.gifts || b.totalCoinsEarned || 0) - (a.gifts || a.totalCoinsEarned || 0)).slice(0, 5),
       pendingWithdrawals: pendingWithdrawals.length,

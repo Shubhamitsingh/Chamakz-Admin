@@ -221,14 +221,14 @@ const Complaints = () => {
           { id: 'Resolved', title: 'Resolved', value: counts.Resolved, icon: CheckCircle, tone: 'emerald' },
           { id: 'Dismissed', title: 'Dismissed', value: counts.Dismissed, icon: XCircle, tone: 'slate' },
         ].map((card) => (
-          <button
+        <button
             key={card.id}
             type="button"
             onClick={() => setStatus(card.id)}
             className={`text-left ${status === card.id ? 'rounded-lg ring-1 ring-gray-900 dark:ring-white' : ''}`}
           >
             <KpiCard title={card.title} value={card.value} icon={card.icon} tone={card.tone} />
-          </button>
+        </button>
         ))}
       </div>
 
@@ -246,7 +246,7 @@ const Complaints = () => {
           <input className="input-field max-w-[140px]" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
           <input className="input-field max-w-[140px]" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
           <ExportButton data={exportRows} columns={exportColumns} filename="complaints" disabled={exportRows.length === 0} />
-        </div>
+      </div>
 
         {pageRows.length === 0 ? (
           <EmptyState title="No complaints in this view" description="Clear filters or choose another status card." />
@@ -274,21 +274,21 @@ const Complaints = () => {
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
                         <Avatar name={row.reporter.name} tone="reporter" />
-                        <div>
+          <div>
                           <p className="font-medium">{row.reporter.name}</p>
                           <p className="font-mono text-[11px] text-gray-500">{row.reporter.numericId}</p>
-                        </div>
-                      </div>
+          </div>
+          </div>
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
                         <Avatar name={row.reported.name} tone="reported" />
-                        <div>
+          <div>
                           <p className="font-medium">{row.reported.name}</p>
                           <p className="font-mono text-[11px] text-gray-500">{row.reported.numericId}</p>
                           {row.multiReport ? <StatusBadge tone="warning">{row.reportsAgainstUser} reports</StatusBadge> : null}
-                        </div>
-                      </div>
+          </div>
+          </div>
                     </td>
                     <td className="px-3 py-2 text-xs">{row.category}</td>
                     <td className="max-w-[180px] px-3 py-2">
@@ -338,7 +338,7 @@ const Complaints = () => {
             </div>
             <div className="space-y-4 p-4">
               <Panel title="Complaint summary">
-                <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="grid grid-cols-2 gap-3 text-sm">
                   <p><span className="text-[11px] uppercase text-gray-500">Category</span><br />{selected.group} · {selected.category}</p>
                   <p><span className="text-[11px] uppercase text-gray-500">Priority</span><br /><StatusBadge tone={priorityTone(selected.priority)}>{selected.priority}</StatusBadge></p>
                   <p><span className="text-[11px] uppercase text-gray-500">Status</span><br /><StatusBadge tone={statusTone(selected.status)}>{selected.status}</StatusBadge></p>
@@ -352,11 +352,11 @@ const Complaints = () => {
                 <Panel title="Reporter">
                   <div className="flex items-center gap-2">
                     <Avatar name={selected.reporter.name} tone="reporter" />
-                    <div>
+                <div>
                       <p className="text-sm font-medium">{selected.reporter.name}</p>
                       <p className="font-mono text-[11px] text-gray-500">{selected.reporter.numericId}</p>
-                    </div>
-                  </div>
+                </div>
+              </div>
                   <p className="mt-2 text-xs text-gray-500">{selected.reporter.email}</p>
                   <p className="text-xs">{selected.reporter.status} · joined {formatWhen(selected.reporter.registeredAt)}</p>
                   <p className="text-xs">Complaints submitted: {selected.reportsByReporter}</p>
@@ -365,18 +365,18 @@ const Complaints = () => {
                 <Panel title="Reported user">
                   <div className="flex items-center gap-2">
                     <Avatar name={selected.reported.name} tone="reported" />
-                    <div>
+                <div>
                       <p className="text-sm font-medium">{selected.reported.name}</p>
                       <p className="font-mono text-[11px] text-gray-500">{selected.reported.numericId}</p>
-                    </div>
-                  </div>
+                </div>
+              </div>
                   <p className="mt-2 text-xs text-gray-500">{selected.reported.email}</p>
                   <p className="text-xs">{selected.reported.status} · joined {formatWhen(selected.reported.registeredAt)}</p>
                   <p className="text-xs">Complaints received: {selected.reportsAgainstUser}</p>
                   {selected.multiReport ? <StatusBadge tone="warning">Multiple reports on this account</StatusBadge> : null}
                   <Link className="mt-2 inline-block text-xs font-medium text-indigo-600" to={`/users/profile/${selected.reported.id}`}>Open user profile</Link>
                 </Panel>
-              </div>
+            </div>
 
               <Panel title="Evidence">
                 {selected.evidence.type === 'none' && <p className="text-sm text-gray-500">No evidence attached</p>}
@@ -392,7 +392,7 @@ const Complaints = () => {
                   <div>
                     <p className="mb-2 text-xs text-gray-500">{selected.evidence.label}</p>
                     <img src={selected.evidence.url} alt="Uploaded evidence placeholder" className="max-h-40 rounded-md border border-gray-200" />
-                  </div>
+            </div>
                 )}
                 {selected.evidence.type === 'live' && (
                   <div className="text-sm">
@@ -400,8 +400,8 @@ const Complaints = () => {
                     <p className="text-xs text-gray-500">{selected.evidence.session}</p>
                     <p className="mt-1 text-xs">{selected.evidence.note}</p>
                     <p className="text-[11px] text-gray-400">Incident {formatWhen(selected.incidentAt)}</p>
-                  </div>
-                )}
+              </div>
+            )}
                 {selected.evidence.type === 'profile' && <p className="text-sm text-gray-600">{selected.evidence.note}</p>}
               </Panel>
 
@@ -419,7 +419,7 @@ const Complaints = () => {
                   <div key={index} className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs dark:border-amber-900/40 dark:bg-amber-950/20">
                     {item.text}
                     <p className="text-[11px] text-gray-400">{item.actor} · {formatWhen(item.at)}</p>
-                  </div>
+                </div>
                 ))}
                 <textarea className="input-field mt-2 min-h-[72px]" placeholder="Add internal note" value={note} onChange={(e) => setNote(e.target.value)} />
                 <button
@@ -441,20 +441,20 @@ const Complaints = () => {
                 <p className="mb-2 text-[11px] text-gray-400">Sample actions only. They update this queue, not production accounts.</p>
                 <div className="flex flex-wrap gap-2">
                   {ACTIONS.map((label) => (
-                    <button
+                <button
                       key={label}
                       type="button"
                       className={`rounded-md border px-2.5 py-1.5 text-[11px] ${DESTRUCTIVE.has(label) ? 'border-red-200 text-red-700' : ''}`}
                       onClick={() => { setActionOpen({ id: selected.id, label }); setReason('') }}
                     >
                       {label}
-                    </button>
+                </button>
                   ))}
-                </div>
+              </div>
               </Panel>
             </div>
           </aside>
-        </div>
+              </div>
       )}
 
       <Modal isOpen={statusOpen} onClose={() => setStatusOpen(false)} title="Update status" size="sm">
@@ -463,17 +463,17 @@ const Complaints = () => {
         </select>
         <div className="mt-4 flex justify-end gap-2">
           <button type="button" className="rounded-md border px-3 py-1.5 text-xs" onClick={() => setStatusOpen(false)}>Cancel</button>
-          <button
+              <button
             type="button"
             className="rounded-md bg-gray-900 px-3 py-1.5 text-xs text-white"
-            onClick={() => {
+                onClick={() => {
               applyStatus(selectedId, nextStatus)
               setStatusOpen(false)
-            }}
-          >
+                }}
+              >
             Update
-          </button>
-        </div>
+              </button>
+            </div>
       </Modal>
 
       <Modal isOpen={Boolean(actionOpen)} onClose={() => setActionOpen(null)} title="Confirm sample action" size="sm">

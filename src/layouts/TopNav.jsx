@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Search, Bell, Moon, Sun, Menu } from 'lucide-react'
+import { Search, Bell, Moon, Sun, Menu, Ticket, UserPlus } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
@@ -336,9 +336,12 @@ const TopNav = () => {
   const getTimeAgo = (date) => {
     const seconds = Math.floor((new Date() - date) / 1000)
     if (seconds < 60) return 'Just now'
-    if (seconds < 3600) return `${Math.floor(seconds / 60)} mins ago`
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`
-    return `${Math.floor(seconds / 86400)} days ago`
+    const minutes = Math.floor(seconds / 60)
+    if (minutes < 60) return minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`
+    const hours = Math.floor(seconds / 3600)
+    if (hours < 24) return hours === 1 ? '1 hour ago' : `${hours} hours ago`
+    const days = Math.floor(seconds / 86400)
+    return days === 1 ? '1 day ago' : `${days} days ago`
   }
 
   // Close dropdowns when clicking outside
@@ -357,7 +360,7 @@ const TopNav = () => {
   }, [])
 
   return (
-    <nav className="h-14 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-20">
+    <nav className={`h-14 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 ${showNotifications || showSearchResults ? 'z-40' : 'z-20'}`}>
       <div className="h-full px-4 flex items-center gap-3 w-full">
         {/* Left Side */}
         <div className="flex items-center gap-4 flex-1">
@@ -504,66 +507,63 @@ const TopNav = () => {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 10 }}
-                  className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50"
+                  className="absolute right-0 mt-2 w-[22rem] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800 z-50"
                 >
-                  <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                    <h3 className="font-semibold">Notifications</h3>
+                  <div className="flex items-start justify-between gap-3 border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+                    <div>
+                      <h3 className="text-sm font-semibold">Notifications</h3>
+                      <p className="mt-0.5 text-xs text-gray-500">
+                        {unreadCount === 0
+                          ? 'You are all caught up'
+                          : `${unreadCount} new`}
+                      </p>
+                    </div>
                     {unreadCount > 0 && (
-                      <p className="text-xs text-gray-500 mt-1">{unreadCount} unread notifications</p>
-                    )}
-                    
-                    {/* Summary */}
-                    {(newUsersCount > 0 || openTicketsCount > 0) && (
-                      <div className="mt-3 space-y-1">
-                        {newUsersCount > 0 && (
-                          <div className="flex items-center gap-2 text-xs">
-                            <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-                            <span className="font-semibold text-blue-600 dark:text-blue-400">
-                              {newUsersCount} new user registration{newUsersCount > 1 ? 's' : ''}
-                            </span>
-                          </div>
-                        )}
-                        {openTicketsCount > 0 && (
-                          <div className="flex items-center gap-2 text-xs">
-                            <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
-                            <span className="font-semibold text-yellow-600 dark:text-yellow-400">
-                              {openTicketsCount} new support ticket{openTicketsCount > 1 ? 's' : ''}
-                            </span>
-                          </div>
-                        )}
-                      </div>
+                      <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
+                        {unreadCount}
+                      </span>
                     )}
                   </div>
-                  <div className="max-h-96 overflow-y-auto">
+                  <div className="max-h-80 overflow-y-auto">
                     {notifications.length === 0 ? (
-                      <div className="p-8 text-center text-gray-500">
-                        <Bell className="w-12 h-12 mx-auto mb-2 text-gray-400" />
+                      <div className="px-4 py-10 text-center text-gray-500">
+                        <Bell className="mx-auto mb-2 h-8 w-8 text-gray-300" />
                         <p className="text-sm">No new notifications</p>
                       </div>
                     ) : (
-                      notifications.map((notif) => (
-                        <div
-                          key={notif.id}
-                          className={`p-4 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer ${
-                            notif.unread ? 'bg-pink-50 dark:bg-pink-900/20' : ''
-                          }`}
-                        >
-                          <div className="flex items-start gap-2">
-                            <div className="flex-1">
-                              <p className="text-sm font-medium">{notif.text}</p>
-                              <p className="text-xs text-gray-500 mt-1">{notif.time}</p>
-                            </div>
-                            {notif.unread && (
-                              <div className="w-2 h-2 bg-red-500 rounded-full mt-1"></div>
-                            )}
-                          </div>
-                        </div>
-                      ))
+                      notifications.map((notif) => {
+                        const isTicket = notif.type === 'ticket'
+                        return (
+                          <button
+                            key={notif.id}
+                            type="button"
+                            className={`flex w-full items-start gap-3 border-b border-gray-100 px-4 py-3 text-left transition-colors hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/60 ${
+                              notif.unread ? 'bg-rose-50/80 dark:bg-rose-950/20' : ''
+                            }`}
+                            onClick={() => {
+                              setShowNotifications(false)
+                              navigate(isTicket ? '/tickets' : '/users')
+                            }}
+                          >
+                            <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                              isTicket ? 'bg-amber-100 text-amber-700' : 'bg-sky-100 text-sky-700'
+                            }`}>
+                              {isTicket ? <Ticket className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-medium">{notif.text}</span>
+                              <span className="mt-0.5 block text-xs text-gray-500">{notif.time}</span>
+                            </span>
+                            {notif.unread && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-rose-500" />}
+                          </button>
+                        )
+                      })
                     )}
                   </div>
-                  <div className="p-2 border-t border-gray-200 dark:border-gray-700">
-                    <button 
-                      className="w-full text-center text-sm text-pink-600 dark:text-pink-400 hover:underline py-2"
+                  <div className="border-t border-gray-200 dark:border-gray-700">
+                    <button
+                      type="button"
+                      className="w-full py-2.5 text-center text-sm font-medium text-pink-600 hover:bg-pink-50 dark:text-pink-400 dark:hover:bg-pink-950/20"
                       onClick={() => setShowNotifications(false)}
                     >
                       Close

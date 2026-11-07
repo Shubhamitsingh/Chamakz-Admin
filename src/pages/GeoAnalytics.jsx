@@ -111,7 +111,7 @@ const GeoAnalytics = () => {
             }}
             className={`rounded-md px-2.5 py-1 text-xs font-medium ${
               preset === item.id
-                ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                ? 'bg-pink-500 text-white'
                 : 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200'
             }`}
           >

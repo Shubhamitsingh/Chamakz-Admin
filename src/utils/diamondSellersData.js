@@ -35,6 +35,7 @@ export const inDateRange = (value, preset, from = '', to = '') => {
   if (preset === 'today') return time >= startToday
   if (preset === '7d') return time >= Date.now() - 7 * 86400000
   if (preset === '30d') return time >= Date.now() - 30 * 86400000
+  if (preset === '90d') return time >= Date.now() - 90 * 86400000
   if (preset === 'month') return time >= new Date(now.getFullYear(), now.getMonth(), 1).getTime()
   if (preset === 'custom') {
     const start = from ? new Date(`${from}T00:00:00`).getTime() : -Infinity
@@ -509,14 +510,68 @@ export const overviewMetrics = (requestRows) => {
   }
 }
 
-export const analyticsView = (preset, from, to) => {
+const bucketStart = (date, grain) => {
+  const value = new Date(date)
+  value.setHours(0, 0, 0, 0)
+  if (grain === 'monthly') {
+    value.setDate(1)
+    return value
+  }
+  if (grain === 'weekly') {
+    const offset = (value.getDay() + 6) % 7
+    value.setDate(value.getDate() - offset)
+  }
+  return value
+}
+
+const bucketLabel = (date, grain) => {
+  if (grain === 'monthly') return date.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' })
+  if (grain === 'weekly') return `Wk ${date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`
+  return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+}
+
+const growthSeries = (rows, grain) => {
+  const map = new Map()
+  rows.forEach((row) => {
+    const start = bucketStart(row.requestedAt, grain)
+    const key = start.getTime()
+    if (!map.has(key)) {
+      map.set(key, {
+        label: bucketLabel(start, grain),
+        requests: 0,
+        accepted: 0,
+        acceptedAmount: 0,
+        volume: 0,
+        completedValue: 0,
+      })
+    }
+    const point = map.get(key)
+    point.requests += 1
+    point.volume += Number(row.amount || 0)
+    if (ACCEPTED_STATUSES.includes(row.status)) {
+      point.accepted += 1
+      point.acceptedAmount = round2(point.acceptedAmount + Number(row.amount || 0))
+    }
+    if (row.status === 'Completed') point.completedValue = round2(point.completedValue + Number(row.amount || 0))
+  })
+  return [...map.entries()].sort((a, b) => a[0] - b[0]).map((entry) => entry[1])
+}
+
+const outcomeBucket = (status) => {
+  if (status === 'Pending') return 'pending'
+  if (status === 'Rejected' || status === 'Cancelled') return 'rejected'
+  if (ACCEPTED_STATUSES.includes(status)) return 'accepted'
+  return 'pending'
+}
+
+export const analyticsView = (preset, from, to, grain = 'daily') => {
   const scoped = listRequests().filter((row) => inDateRange(row.requestedAt, preset, from, to))
   const metrics = requestMetrics(scoped)
   const completed = scoped.filter((row) => row.status === 'Completed')
   const bySeller = {}
   scoped.forEach((row) => {
     if (!bySeller[row.sellerId]) {
-      bySeller[row.sellerId] = { sellerId: row.sellerId, sellerName: row.sellerName, requests: [], }
+      bySeller[row.sellerId] = { sellerId: row.sellerId, sellerName: row.sellerName, requests: [] }
     }
     bySeller[row.sellerId].requests.push(row)
   })
@@ -525,23 +580,52 @@ export const analyticsView = (preset, from, to) => {
     ...requestMetrics(item.requests),
   })).sort((a, b) => b.completedAmount - a.completedAmount)
 
-  const dayMap = {}
+  const trend = growthSeries(scoped, grain)
+  const sellerBars = [...sellerRows]
+    .sort((a, b) => b.accepted - a.accepted)
+    .map((row) => ({
+      name: row.sellerName,
+      accepted: row.accepted,
+      rejected: row.rejected + row.cancelled,
+      pending: row.pending,
+    }))
+  const outcome = { accepted: 0, rejected: 0, pending: 0 }
+  scoped.forEach((row) => { outcome[outcomeBucket(row.status)] += 1 })
+  const outcomeTotal = outcome.accepted + outcome.rejected + outcome.pending
+  const share = (count) => (outcomeTotal ? round2((count / outcomeTotal) * 100) : 0)
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const slots = ['12a', '4a', '8a', '12p', '4p', '8p']
+  const heat = days.map((day) => slots.map((slot) => ({ day, slot, count: 0 })))
   scoped.forEach((row) => {
-    const key = new Date(row.requestedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
-    if (!dayMap[key]) dayMap[key] = { label: key, requests: 0, completedValue: 0, accepted: 0 }
-    dayMap[key].requests += 1
-    if (ACCEPTED_STATUSES.includes(row.status)) dayMap[key].accepted += 1
-    if (row.status === 'Completed') dayMap[key].completedValue += row.amount
+    const stamp = new Date(row.requestedAt)
+    const slot = Math.min(5, Math.floor(stamp.getHours() / 4))
+    heat[stamp.getDay()][slot].count += 1
   })
-  const trend = Object.values(dayMap).slice().reverse()
 
   return {
     metrics,
     sellerRows,
-    topAccepted: [...sellerRows].sort((a, b) => b.accepted - a.accepted).slice(0, 5),
+    topAccepted: [...sellerRows].sort((a, b) => b.accepted - a.accepted).slice(0, 10),
     topCompleted: sellerRows.slice(0, 5),
     topCommission: [...sellerRows].sort((a, b) => b.sellerCommission - a.sellerCommission).slice(0, 5),
     trend,
+    sellerBars,
+    ranking: [...sellerRows].sort((a, b) => b.accepted - a.accepted).slice(0, 10).map((row) => ({
+      name: row.sellerName,
+      accepted: row.accepted,
+      acceptedAmount: row.acceptedAmount,
+    })),
+    outcome: [
+      { name: 'Accepted', value: outcome.accepted, percent: share(outcome.accepted) },
+      { name: 'Rejected', value: outcome.rejected, percent: share(outcome.rejected) },
+      { name: 'Pending', value: outcome.pending, percent: share(outcome.pending) },
+    ],
+    funnel: [
+      { name: 'Total requests', value: metrics.total },
+      { name: 'Accepted', value: metrics.accepted },
+      { name: 'Completed', value: metrics.completed },
+    ],
+    heatmap: { days, slots, cells: heat },
     completedCount: completed.length,
   }
 }

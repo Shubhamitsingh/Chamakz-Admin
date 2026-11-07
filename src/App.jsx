@@ -21,6 +21,8 @@ import Settings from './pages/Settings'
 import Complaints from './pages/Complaints'
 import GeoAnalytics from './pages/GeoAnalytics'
 import DiamondSellers from './pages/DiamondSellers'
+import LiveStreaming from './pages/LiveStreaming'
+import Leaderboard from './pages/Leaderboard'
 
 function App() {
   return (
@@ -42,6 +44,8 @@ function App() {
             >
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
+            <Route path="live-streaming" element={<LiveStreaming />} />
+            <Route path="leaderboard" element={<Leaderboard />} />
             <Route path="users" element={<Users />} />
             <Route path="users/analytics" element={<UserAnalytics />} />
             <Route path="users/profile/:userId" element={<UserProfile />} />

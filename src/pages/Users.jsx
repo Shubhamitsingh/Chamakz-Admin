@@ -129,7 +129,7 @@ const Users = () => {
             to={item.path}
             className={`whitespace-nowrap rounded-md border px-2.5 py-1 text-[11px] font-medium ${
               segment === item.id
-                ? 'border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900'
+                ? 'border-pink-500 bg-pink-500 text-white'
                 : 'border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300'
             }`}
           >
@@ -247,7 +247,7 @@ const Users = () => {
                             <Shield className="h-4 w-4" />
                           </button>
                         )}
-                      </div>
+          </div>
                     </td>
                   </tr>
                 ))}
@@ -264,7 +264,7 @@ const Users = () => {
             onPageChange={setPage}
             onItemsPerPageChange={(value) => { setPerPage(value); setPage(1) }}
           />
-        </div>
+                </div>
       </Panel>
 
       <Modal isOpen={Boolean(confirm)} onClose={() => setConfirm(null)} title={confirm?.kind === 'restore' ? 'Restore account' : 'Suspend account'} size="sm">
@@ -276,8 +276,8 @@ const Users = () => {
         <div className="mt-4 flex justify-end gap-2">
           <button type="button" className="rounded-md border px-3 py-1.5 text-xs" onClick={() => setConfirm(null)}>Cancel</button>
           <button type="button" className="rounded-md bg-gray-900 px-3 py-1.5 text-xs text-white dark:bg-white dark:text-gray-900" onClick={runAction}>Confirm</button>
-        </div>
-      </Modal>
+          </div>
+        </Modal>
     </div>
   )
 }

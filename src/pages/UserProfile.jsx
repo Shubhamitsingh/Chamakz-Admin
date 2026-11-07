@@ -143,7 +143,7 @@ const UserProfile = () => {
             type="button"
             onClick={() => setTab(item.id)}
             className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium ${
-              tab === item.id ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300'
+              tab === item.id ? 'bg-pink-500 text-white' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300'
             }`}
           >
             {item.label}

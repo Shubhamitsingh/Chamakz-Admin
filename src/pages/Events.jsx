@@ -152,7 +152,7 @@ const Events = () => {
       <div className="flex flex-wrap items-center gap-2">
         <SearchBar placeholder="Search title or copy" value={search} onChange={setSearch} />
         {['all', ...EVENT_KINDS].map((item) => (
-          <button key={item} type="button" className={`rounded-full px-3 py-1 text-xs ${kind === item ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'bg-white ring-1 ring-gray-200 dark:bg-gray-800'}`} onClick={() => setKind(item)}>
+          <button key={item} type="button" className={`rounded-full px-3 py-1 text-xs ${kind === item ? 'bg-pink-500 text-white' : 'bg-white ring-1 ring-gray-200 dark:bg-gray-800'}`} onClick={() => setKind(item)}>
             {item === 'all' ? 'All types' : item}
           </button>
         ))}
@@ -160,7 +160,7 @@ const Events = () => {
           <option value="all">All statuses</option>
           {EVENT_STATUSES.map((item) => <option key={item} value={item}>{item}</option>)}
         </select>
-      </div>
+        </div>
 
       <Panel title="Calendar" action={<span className="text-[11px] text-gray-500">{filtered.length} shown</span>} padded={false}>
         {pageRows.length === 0 ? (
@@ -188,8 +188,8 @@ const Events = () => {
                 </div>
               </article>
             ))}
-          </div>
-        )}
+        </div>
+      )}
       </Panel>
 
       <Pagination currentPage={page} totalPages={totalPages} totalItems={filtered.length} itemsPerPage={perPage} onPageChange={setPage} onItemsPerPageChange={(value) => { setPerPage(value); setPage(1) }} />
@@ -235,7 +235,7 @@ const Events = () => {
             <button type="button" className="rounded-md px-3 py-1.5 text-xs ring-1 ring-gray-200" onClick={() => setFormOpen(false)}>Cancel</button>
             <button type="button" className="rounded-md bg-violet-600 px-3 py-1.5 text-xs text-white" onClick={save}>Save sample</button>
           </div>
-        </div>
+          </div>
       </Modal>
 
       <Modal isOpen={Boolean(removeId)} onClose={() => setRemoveId(null)} title="Remove sample item">

@@ -21,6 +21,7 @@ import SafetyFeed from '../components/dashboard/SafetyFeed'
 import HostsAnalytics from '../components/dashboard/HostsAnalytics'
 import SystemStrip from '../components/dashboard/SystemStrip'
 import GeoSnapshot from '../components/dashboard/GeoSnapshot'
+import ActivityHeatmap from '../components/dashboard/ActivityHeatmap'
 import { exportToCSV } from '../utils/exportUtils'
 import { formatCompact, timeAgo } from '../utils/dashboardFields'
 
@@ -147,7 +148,7 @@ const Dashboard = () => {
             onClick={() => setPreset(item.id)}
             className={`rounded-md px-2.5 py-1 text-xs font-medium ${
               preset === item.id
-                ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                ? 'bg-pink-500 text-white'
                 : 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200'
             }`}
           >
@@ -158,8 +159,8 @@ const Dashboard = () => {
           <>
             <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="input-field max-w-[140px]" />
             <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="input-field max-w-[140px]" />
-          </>
-        )}
+                    </>
+                  )}
         <select value={countryFilter} onChange={(e) => setCountryFilter(e.target.value)} className="input-field max-w-[160px]">
           <option value="all">All countries</option>
           {metrics.countryOptions.map((item) => (
@@ -191,29 +192,30 @@ const Dashboard = () => {
         <div className="mb-2 flex items-end justify-between">
           <h2 className="text-sm font-semibold">Executive overview</h2>
           <p className="text-[11px] text-gray-400">{metrics.totalUsers} users in current filters</p>
-        </div>
+                </div>
         <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">
           <KpiCard title="Registered" value={formatCompact(metrics.totalUsers)} icon={Users} href="/users" sparkline={metrics.sparkline} hint="All matching filters" tone="blue" />
-          <KpiCard title="DAU (24h)" value={formatCompact(metrics.activeUsers)} icon={UserCheck} href="/users" hint="lastActive within 24h" tone="emerald" />
-          <KpiCard title="MAU (30d)" value={formatCompact(metrics.mauUsers)} icon={Users} href="/users" hint="lastActive within 30d" tone="sky" />
-          <KpiCard title="Online now" value={formatCompact(metrics.onlineUsers)} icon={Activity} href="/users" hint="last 5 minutes" tone="teal" />
+          <KpiCard title="DAU (24h)" value={formatCompact(metrics.activeUsers)} icon={UserCheck} href="/users" hint="lastActive within 24h" sparkline={metrics.activeSparkline} tone="sky" />
+          <KpiCard title="MAU (30d)" value={formatCompact(metrics.mauUsers)} icon={Users} href="/users" hint="lastActive within 30d" sparkline={metrics.activeSparkline} tone="blue" />
+          <KpiCard title="Online now" value={formatCompact(metrics.onlineUsers)} icon={Activity} href="/users" hint="last 5 minutes" sparkline={metrics.activeSparkline} tone="sky" />
           <KpiCard title="New in range" value={formatCompact(metrics.newInRange)} icon={Users} href="/users" trend={metrics.rangeUserChange} sparkline={metrics.sparkline} tone="indigo" />
-          <KpiCard title="Live / viewers" value={`${metrics.liveRooms} / ${formatCompact(metrics.liveViewers)}`} icon={Radio} tone="rose" />
-          <KpiCard title="Revenue (range)" value={`₹${formatCompact(metrics.revenueInRange)}`} icon={DollarSign} href="/transactions" trend={metrics.revenueChange} tone="emerald" />
+          <KpiCard title="Live / viewers" value={`${metrics.liveRooms} / ${formatCompact(metrics.liveViewers)}`} icon={Radio} sparkline={metrics.activeSparkline} tone="blue" />
+          <KpiCard title="Revenue (range)" value={`₹${formatCompact(metrics.revenueInRange)}`} icon={DollarSign} href="/transactions" trend={metrics.revenueChange} sparkline={metrics.revenueSparkline} tone="sky" />
           <KpiCard title="Payouts / reports" value={`${metrics.pendingWithdrawals} / ${metrics.pendingReports}`} icon={metrics.pendingReports ? Shield : Wallet} href={metrics.pendingReports ? '/complaints' : '/transactions'} tone="orange" />
-        </div>
+                </div>
       </section>
 
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-12">
-        <div className="xl:col-span-7">
+        <div className="h-full xl:col-span-7">
           <LiveOps liveStreams={liveStreams} metrics={metrics} stoppingStream={stoppingStream} onStopStream={handleStopStream} />
-        </div>
-        <div className="xl:col-span-5">
+                </div>
+        <div className="h-full xl:col-span-5">
           <EconomyPanel metrics={metrics} availability={availability} />
         </div>
       </div>
 
       <SafetyFeed metrics={metrics} />
+      <ActivityHeatmap heatmap={metrics.activityHeatmap} />
       <GeoSnapshot preset={['today', '7d', '30d', '90d', 'custom'].includes(preset) ? preset : '30d'} />
       <HostsAnalytics
         metrics={metrics}

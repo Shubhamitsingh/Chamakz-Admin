@@ -16,6 +16,7 @@ import { formatCompact, timeAgo } from '../../utils/dashboardFields'
 
 const EconomyPanel = ({ metrics, availability }) => (
   <Panel
+    className="flex h-full flex-col"
     title="Virtual economy"
     action={
       <Link to="/transactions" className="text-xs font-medium text-gray-600 hover:underline">
