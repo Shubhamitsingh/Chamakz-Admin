@@ -10,7 +10,7 @@ const Status = ({ label, value, ok, muted }) => (
 )
 
 const SystemStrip = ({ health }) => (
-  <Panel title="System">
+  <Panel className="surface-raised" title="System">
     <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
       <Status
         label="Database"

@@ -59,7 +59,7 @@ const LiveOps = ({ liveStreams, metrics, stoppingStream, onStopStream }) => {
 
   return (
     <Panel
-      className="flex h-full flex-col"
+      className="surface-raised flex h-full flex-col"
       title="Live streaming"
       action={
         <span className="inline-flex items-center gap-1.5 rounded-md bg-rose-600 px-2 py-0.5 text-[11px] font-semibold text-white">
@@ -116,11 +116,12 @@ const LiveOps = ({ liveStreams, metrics, stoppingStream, onStopStream }) => {
             {selected.playbackUrl ? (
               <video src={selected.playbackUrl} className="aspect-video w-full bg-black object-cover" controls autoPlay muted playsInline />
             ) : (
-              <div className="flex aspect-video flex-col items-center justify-center gap-2 bg-gradient-to-br from-[#0f2744] to-[#155e75] px-6 text-center">
+              <div className="flex items-center gap-3 px-4 py-5">
                 <UserAvatar userId={selected.hostId} name={selected.hostName} />
-                <p className="text-sm font-semibold">{selected.hostName}</p>
-                <p className="text-[11px] text-cyan-100">ID {selected.numericUserId || selected.hostId}</p>
-                <p className="max-w-xs text-[11px] text-slate-300">This room has no video URL yet, so the picture cannot play. Viewer count, gifts, and duration are from the live record.</p>
+                <div>
+                  <p className="text-sm font-semibold">{selected.hostName}</p>
+                  <p className="text-[11px] text-cyan-100">ID {selected.numericUserId || selected.hostId}</p>
+                </div>
               </div>
             )}
           </div>
@@ -167,7 +168,6 @@ const LiveOps = ({ liveStreams, metrics, stoppingStream, onStopStream }) => {
       )}
 
       <p className="mt-3 text-[11px] text-gray-400">
-        Search any host ID to open that live room. A video plays only when the room record includes a stream URL.{' '}
         <Link to="/complaints" className="font-medium text-gray-700 underline dark:text-gray-200">Open reports</Link>
       </p>
     </Panel>

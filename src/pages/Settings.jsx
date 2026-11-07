@@ -19,7 +19,7 @@ const defaults = {
 }
 
 const Toggle = ({ on, onClick, label, hint }) => (
-  <button type="button" onClick={onClick} className="flex w-full items-center justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2.5 text-left dark:border-gray-700">
+  <button type="button" onClick={onClick} className="control-tactile flex w-full items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-left shadow-sm dark:border-gray-700 dark:bg-gray-800">
     <span>
       <span className="block text-sm font-medium">{label}</span>
       {hint ? <span className="text-[11px] text-gray-500">{hint}</span> : null}
@@ -88,7 +88,7 @@ const Settings = () => {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="edit-workspace space-y-3">
       <PageHeader
         title="Settings"
         description="Admin preferences for this browser. Dark mode applies immediately. Nothing is emailed or pushed to users."
@@ -100,7 +100,7 @@ const Settings = () => {
       />
 
       <div className="grid gap-3 lg:grid-cols-2">
-        <Panel title="General">
+        <Panel title="General" className="surface-raised">
           <div className="space-y-3">
             <label className="block text-xs font-medium">Application name
               <input className="input-field mt-1" value={settings.appName} onChange={(e) => patch('appName', e.target.value)} />
@@ -114,7 +114,7 @@ const Settings = () => {
                 <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl bg-pink-500 text-lg font-bold text-white">
                   {settings.logo ? <img src={settings.logo} alt="" className="h-full w-full object-cover" /> : 'C'}
                 </div>
-                <label className="inline-flex cursor-pointer items-center gap-1 rounded-md px-3 py-1.5 text-xs ring-1 ring-gray-200 dark:ring-gray-600">
+                <label className="control-tactile inline-flex cursor-pointer items-center gap-1 rounded-md bg-white px-3 py-1.5 text-xs ring-1 ring-gray-200 dark:bg-gray-800 dark:ring-gray-600">
                   <Upload className="h-3.5 w-3.5" /> Upload sample logo
                   <input type="file" accept="image/*" className="hidden" onChange={(e) => pickFile(e.target.files?.[0], 'logo')} />
                 </label>
@@ -129,13 +129,13 @@ const Settings = () => {
           </div>
         </Panel>
 
-        <Panel title="Admin profile">
+        <Panel title="Admin profile" className="surface-raised">
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-violet-600 text-xl font-semibold text-white">
                 {settings.adminAvatar ? <img src={settings.adminAvatar} alt="" className="h-full w-full object-cover" /> : (settings.adminName || 'A').charAt(0)}
               </div>
-              <label className="inline-flex cursor-pointer items-center gap-1 rounded-md px-3 py-1.5 text-xs ring-1 ring-gray-200 dark:ring-gray-600">
+              <label className="control-tactile inline-flex cursor-pointer items-center gap-1 rounded-md bg-white px-3 py-1.5 text-xs ring-1 ring-gray-200 dark:bg-gray-800 dark:ring-gray-600">
                 <Upload className="h-3.5 w-3.5" /> Upload avatar
                 <input type="file" accept="image/*" className="hidden" onChange={(e) => pickFile(e.target.files?.[0], 'adminAvatar')} />
               </label>
@@ -150,13 +150,13 @@ const Settings = () => {
               <p className="mb-1 text-xs font-medium">Password (sample only)</p>
               <input className="input-field mb-2" type="password" placeholder="New password" value={password.next} onChange={(e) => setPassword({ ...password, next: e.target.value })} />
               <input className="input-field mb-2" type="password" placeholder="Confirm password" value={password.confirm} onChange={(e) => setPassword({ ...password, confirm: e.target.value })} />
-              <button type="button" className="rounded-md px-3 py-1.5 text-xs ring-1 ring-gray-200 dark:ring-gray-600" onClick={changePassword}>Update sample password</button>
+              <button type="button" className="control-tactile rounded-md bg-white px-3 py-1.5 text-xs ring-1 ring-gray-200 dark:bg-gray-800 dark:ring-gray-600" onClick={changePassword}>Update sample password</button>
             </div>
           </div>
         </Panel>
       </div>
 
-      <Panel title="Admin alerts">
+      <Panel title="Admin alerts" className="surface-raised">
         <p className="mb-3 text-xs text-gray-500">These flags only change this settings screen. They do not send email, SMS, or push to users.</p>
         <div className="grid gap-2 md:grid-cols-3">
           <Toggle label="In-panel alerts" hint="Toasts and badges in this admin" on={settings.notifications} onClick={() => patch('notifications', !settings.notifications)} />

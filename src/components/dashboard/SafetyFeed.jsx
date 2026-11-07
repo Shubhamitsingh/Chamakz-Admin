@@ -26,7 +26,7 @@ const SafetyFeed = ({ metrics }) => (
   <div className="grid grid-cols-1 items-stretch gap-3 lg:grid-cols-12">
     <div className="lg:col-span-7">
       <Panel
-        className="flex h-full flex-col"
+        className="surface-raised flex h-full flex-col"
         title="Safety & moderation"
         action={
           <Link to="/complaints" className="text-xs font-medium text-gray-600 hover:underline">
@@ -90,7 +90,7 @@ const SafetyFeed = ({ metrics }) => (
     </div>
     <div className="lg:col-span-5">
       <Panel
-        className="flex h-full flex-col"
+        className="surface-raised flex h-full flex-col"
         title="Activity feed"
         action={<span className="text-[11px] text-gray-400">Live queue</span>}
       >

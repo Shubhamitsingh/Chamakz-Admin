@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChevronDown, Send, X } from 'lucide-react'
+import { ChevronDown, ChevronLeft, Send, X } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
 import SearchBar from '../components/SearchBar'
 import StatusBadge from '../components/StatusBadge'
 import EmptyState from '../components/EmptyState'
 import { useApp } from '../context/AppContext'
+import useMediaQuery from '../hooks/useMediaQuery'
 import {
   formatClock,
   formatDay,
@@ -27,6 +28,7 @@ const Avatar = ({ name }) => (
 
 const Chats = () => {
   const { showToast } = useApp()
+  const isDesktop = useMediaQuery('(min-width: 1025px)')
   const [tick, setTick] = useState(0)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
@@ -42,8 +44,9 @@ const Chats = () => {
   const refresh = () => setTick((value) => value + 1)
 
   useEffect(() => {
-    if (!selectedId && chats[0]) setSelectedId(chats[0].id)
-  }, [chats, selectedId])
+    if (!isDesktop || selectedId || !chats[0]) return
+    setSelectedId(chats[0].id)
+  }, [chats, selectedId, isDesktop])
 
   useEffect(() => {
     if (!selectedId) return
@@ -98,7 +101,7 @@ const Chats = () => {
 
       <section className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800" style={{ height: 'calc(100vh - 150px)' }}>
         <div className="flex h-full">
-          <aside className="flex w-80 shrink-0 flex-col border-r border-gray-200 dark:border-gray-700">
+          <aside className={`w-full shrink-0 flex-col border-r border-gray-200 dark:border-gray-700 min-[1025px]:flex min-[1025px]:w-80 ${selected ? 'hidden' : 'flex'}`}>
             <div className="space-y-2 border-b border-gray-200 p-3 dark:border-gray-700">
               <SearchBar placeholder="Search name, ID, or message" value={search} onChange={setSearch} />
               <div className="flex flex-wrap gap-1">
@@ -151,11 +154,19 @@ const Chats = () => {
             </div>
           </aside>
 
-          <div className="relative flex min-w-0 flex-1 flex-col">
+          <div className={`relative min-w-0 flex-1 flex-col min-[1025px]:flex ${selected ? 'flex' : 'hidden'}`}>
             {selected ? (
               <>
-                <header className="flex items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-                  <div className="flex min-w-0 items-center gap-3">
+                <header className="flex items-center justify-between gap-2 border-b border-gray-200 px-3 py-3 dark:border-gray-700 min-[1025px]:gap-3 min-[1025px]:px-4">
+                  <div className="flex min-w-0 items-center gap-2 min-[1025px]:gap-3">
+                    <button
+                      type="button"
+                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 min-[1025px]:hidden"
+                      aria-label="Back to chats"
+                      onClick={() => setSelectedId(null)}
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </button>
                     <Avatar name={selected.user.name} />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold">{selected.user.name}</p>
@@ -255,7 +266,7 @@ const Chats = () => {
                     initial={{ x: 320 }}
                     animate={{ x: 0 }}
                     exit={{ x: 320 }}
-                    className="absolute inset-y-0 right-0 z-50 w-80 overflow-y-auto border-l border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800"
+                    className="absolute inset-y-0 right-0 z-50 w-full overflow-y-auto border-l border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800 min-[1025px]:w-80"
                   >
                     <div className="mb-4 flex items-center justify-between">
                       <p className="text-sm font-semibold">Chat details</p>

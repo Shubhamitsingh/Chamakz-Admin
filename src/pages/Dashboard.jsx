@@ -1,21 +1,16 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   Activity,
   DollarSign,
   Radio,
-  Shield,
   UserCheck,
   Users,
   Wallet,
 } from 'lucide-react'
-import { doc, serverTimestamp, updateDoc } from 'firebase/firestore'
-import { db } from '../firebase/config'
-import { useApp } from '../context/AppContext'
 import { useDashboardData } from '../hooks/useDashboardData'
 import KpiCard from '../components/KpiCard'
 import Loader from '../components/Loader'
 import ActionCenter from '../components/dashboard/ActionCenter'
-import LiveOps from '../components/dashboard/LiveOps'
 import EconomyPanel from '../components/dashboard/EconomyPanel'
 import SafetyFeed from '../components/dashboard/SafetyFeed'
 import HostsAnalytics from '../components/dashboard/HostsAnalytics'
@@ -24,6 +19,7 @@ import GeoSnapshot from '../components/dashboard/GeoSnapshot'
 import ActivityHeatmap from '../components/dashboard/ActivityHeatmap'
 import { exportToCSV } from '../utils/exportUtils'
 import { formatCompact, timeAgo } from '../utils/dashboardFields'
+import { createEconomy, inr, summarize } from '../economy/data'
 
 const DATE_PRESETS = [
   { id: 'today', label: 'Today' },
@@ -37,7 +33,6 @@ const DATE_PRESETS = [
 ]
 
 const Dashboard = () => {
-  const { showToast } = useApp()
   const [preset, setPreset] = useState('7d')
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd] = useState('')
@@ -46,9 +41,10 @@ const Dashboard = () => {
   const [userTypeFilter, setUserTypeFilter] = useState('all')
   const [fullscreen, setFullscreen] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
-  const [stoppingStream, setStoppingStream] = useState(null)
 
-  const { loading, error, health, availability, lastUpdated, liveStreams, metrics } = useDashboardData({
+  const economyTotals = useMemo(() => summarize(createEconomy(), { start: new Date(0), end: new Date() }), [])
+
+  const { loading, error, health, availability, lastUpdated, metrics } = useDashboardData({
     preset,
     customStart,
     customEnd,
@@ -56,40 +52,6 @@ const Dashboard = () => {
     platformFilter,
     userTypeFilter,
   })
-
-  const handleStopStream = async (stream) => {
-    setStoppingStream(stream.id)
-    try {
-      if (stream.collection === 'users') {
-        await updateDoc(doc(db, 'users', stream.hostId), {
-          isLive: false,
-          liveStreamData: null,
-          liveEndedAt: serverTimestamp(),
-          liveEndedBy: 'admin',
-        })
-      } else {
-        await updateDoc(doc(db, stream.collection, stream.id), {
-          status: 'ended',
-          endedAt: serverTimestamp(),
-          endedBy: 'admin',
-        })
-        if (stream.hostId) {
-          try {
-            await updateDoc(doc(db, 'users', stream.hostId), {
-              isLive: false,
-              liveStreamData: null,
-            })
-          } catch {
-            // host doc may not exist
-          }
-        }
-      }
-      showToast('Stream stopped', 'success')
-    } catch (err) {
-      showToast(err.message || 'Could not stop stream', 'error')
-    }
-    setStoppingStream(null)
-  }
 
   const exportReport = () => {
     exportToCSV(
@@ -140,7 +102,7 @@ const Dashboard = () => {
         </div>
       </header>
 
-      <div className="filter-bar">
+      <div className="filter-bar surface-raised">
         {DATE_PRESETS.map((item) => (
           <button
             key={item.id}
@@ -193,26 +155,19 @@ const Dashboard = () => {
           <h2 className="text-sm font-semibold">Executive overview</h2>
           <p className="text-[11px] text-gray-400">{metrics.totalUsers} users in current filters</p>
                 </div>
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">
+        <div className="grid grid-cols-1 gap-2 min-[376px]:grid-cols-2 md:grid-cols-4 xl:grid-cols-8">
           <KpiCard title="Registered" value={formatCompact(metrics.totalUsers)} icon={Users} href="/users" sparkline={metrics.sparkline} hint="All matching filters" tone="blue" />
           <KpiCard title="DAU (24h)" value={formatCompact(metrics.activeUsers)} icon={UserCheck} href="/users" hint="lastActive within 24h" sparkline={metrics.activeSparkline} tone="sky" />
           <KpiCard title="MAU (30d)" value={formatCompact(metrics.mauUsers)} icon={Users} href="/users" hint="lastActive within 30d" sparkline={metrics.activeSparkline} tone="blue" />
           <KpiCard title="Online now" value={formatCompact(metrics.onlineUsers)} icon={Activity} href="/users" hint="last 5 minutes" sparkline={metrics.activeSparkline} tone="sky" />
           <KpiCard title="New in range" value={formatCompact(metrics.newInRange)} icon={Users} href="/users" trend={metrics.rangeUserChange} sparkline={metrics.sparkline} tone="indigo" />
           <KpiCard title="Live / viewers" value={`${metrics.liveRooms} / ${formatCompact(metrics.liveViewers)}`} icon={Radio} sparkline={metrics.activeSparkline} tone="blue" />
-          <KpiCard title="Revenue (range)" value={`₹${formatCompact(metrics.revenueInRange)}`} icon={DollarSign} href="/transactions" trend={metrics.revenueChange} sparkline={metrics.revenueSparkline} tone="sky" />
-          <KpiCard title="Payouts / reports" value={`${metrics.pendingWithdrawals} / ${metrics.pendingReports}`} icon={metrics.pendingReports ? Shield : Wallet} href={metrics.pendingReports ? '/complaints' : '/transactions'} tone="orange" />
+          <KpiCard title="Platform revenue" value={inr(economyTotals.platformShare)} icon={DollarSign} href="/economy" hint="Our share of gifted diamonds" tone="emerald" />
+          <KpiCard title="Paid / left" value={`${inr(economyTotals.paidWithdrawals)} / ${inr(economyTotals.hostEntitlement - economyTotals.paidWithdrawals)}`} icon={Wallet} href="/economy/withdrawals" hint="Paid to hosts / still to pay" tone="amber" />
                 </div>
       </section>
 
-      <div className="grid grid-cols-1 gap-3 xl:grid-cols-12">
-        <div className="h-full xl:col-span-7">
-          <LiveOps liveStreams={liveStreams} metrics={metrics} stoppingStream={stoppingStream} onStopStream={handleStopStream} />
-                </div>
-        <div className="h-full xl:col-span-5">
-          <EconomyPanel metrics={metrics} availability={availability} />
-        </div>
-      </div>
+      <EconomyPanel preset={preset} customStart={customStart} customEnd={customEnd} />
 
       <SafetyFeed metrics={metrics} />
       <ActivityHeatmap heatmap={metrics.activityHeatmap} />

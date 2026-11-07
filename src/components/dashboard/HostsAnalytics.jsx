@@ -25,6 +25,7 @@ const HostsAnalytics = ({ metrics, availability, detailsOpen, onToggleDetails })
     <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
       <div className="lg:col-span-5">
         <Panel
+          className="surface-raised"
           title="Hosts"
           action={
             <Link to="/host-applications" className="text-xs font-medium text-gray-600 hover:underline">
@@ -70,7 +71,7 @@ const HostsAnalytics = ({ metrics, availability, detailsOpen, onToggleDetails })
         </Panel>
       </div>
       <div className="lg:col-span-7">
-        <Panel title="User growth">
+        <Panel className="surface-raised" title="User growth">
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={metrics.activitySeries}>
@@ -100,6 +101,7 @@ const HostsAnalytics = ({ metrics, availability, detailsOpen, onToggleDetails })
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
         <div className="lg:col-span-4">
           <Panel
+            className="surface-raised"
             title="Location"
             action={
               <Link to="/geo-analytics" className="text-xs font-medium text-gray-600 hover:underline">
@@ -125,7 +127,7 @@ const HostsAnalytics = ({ metrics, availability, detailsOpen, onToggleDetails })
           </Panel>
         </div>
         <div className="lg:col-span-4">
-          <Panel title="Devices">
+          <Panel className="surface-raised" title="Devices">
             {!availability.platform ? (
               <p className="text-sm text-gray-500">No platform field on users.</p>
             ) : (
@@ -146,7 +148,7 @@ const HostsAnalytics = ({ metrics, availability, detailsOpen, onToggleDetails })
           </Panel>
         </div>
         <div className="lg:col-span-4">
-          <Panel title="Dating & social">
+          <Panel className="surface-raised" title="Dating & social">
             {availability.dating ? (
               <p className="text-sm">
                 {metrics.datingEvents} dating events in connected collections.

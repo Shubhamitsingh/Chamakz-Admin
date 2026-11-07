@@ -14,7 +14,7 @@ const GeoSnapshot = ({ preset = '7d' }) => {
     <div className="grid grid-cols-1 items-stretch gap-3 xl:grid-cols-12">
       <div className="xl:col-span-7">
         <Panel
-          className="flex h-full flex-col"
+          className="surface-raised flex h-full flex-col"
           title="Geography snapshot"
           action={
             <Link to="/geo-analytics" className="text-xs font-medium text-gray-600 hover:underline">
@@ -32,7 +32,7 @@ const GeoSnapshot = ({ preset = '7d' }) => {
       </div>
       <div className="xl:col-span-5">
         <Panel
-          className="flex h-full flex-col"
+          className="surface-raised flex h-full flex-col"
           title="Top cities"
           action={<span className="text-[11px] text-gray-400">{view.kpis.topState} leads states</span>}
         >

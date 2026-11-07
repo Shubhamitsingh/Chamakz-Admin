@@ -8,9 +8,10 @@ import { db, auth } from '../firebase/config'
 import { onAuthStateChanged } from 'firebase/auth'
 
 const TopNav = () => {
-  const { darkMode, toggleDarkMode, toggleSidebar, user, newUsersCount, openTicketsCount, logout } = useApp()
+  const { darkMode, toggleDarkMode, toggleMobileNav, mobileNavOpen, user, newUsersCount, openTicketsCount, logout } = useApp()
   const navigate = useNavigate()
   const [showNotifications, setShowNotifications] = useState(false)
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [searchTerm, setSearchTerm] = useState('')
@@ -361,17 +362,29 @@ const TopNav = () => {
 
   return (
     <nav className={`h-14 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 ${showNotifications || showSearchResults ? 'z-40' : 'z-20'}`}>
-      <div className="h-full px-4 flex items-center gap-3 w-full">
+      <div className="flex h-full w-full items-center gap-2 px-3 min-[1025px]:gap-3 min-[1025px]:px-4">
         {/* Left Side */}
-        <div className="flex items-center gap-4 flex-1">
+        <div className="flex min-w-0 flex-1 items-center gap-2 min-[1025px]:gap-4">
           <button
-            onClick={toggleSidebar}
-            className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            type="button"
+            onClick={toggleMobileNav}
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 min-[1025px]:hidden"
+            aria-label={mobileNavOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={mobileNavOpen}
           >
             <Menu className="w-5 h-5" />
           </button>
+
+          <button
+            type="button"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 sm:hidden"
+            aria-label="Search"
+            onClick={() => setMobileSearchOpen((open) => !open)}
+          >
+            <Search className="h-5 w-5" />
+          </button>
           
-          <div className="relative flex-1 max-w-md" ref={searchDropdownRef}>
+          <div className={`relative min-w-0 max-w-md flex-1 ${mobileSearchOpen ? 'max-sm:absolute max-sm:left-3 max-sm:right-3 max-sm:top-14 max-sm:z-50 max-sm:max-w-none max-sm:rounded-lg max-sm:bg-white max-sm:p-2 max-sm:shadow-lg dark:max-sm:bg-gray-800' : 'max-sm:hidden'}`} ref={searchDropdownRef}>
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
@@ -507,7 +520,7 @@ const TopNav = () => {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 10 }}
-                  className="absolute right-0 mt-2 w-[22rem] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800 z-50"
+                  className="absolute right-0 z-50 mt-2 w-[22rem] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800"
                 >
                   <div className="flex items-start justify-between gap-3 border-b border-gray-200 px-4 py-3 dark:border-gray-700">
                     <div>

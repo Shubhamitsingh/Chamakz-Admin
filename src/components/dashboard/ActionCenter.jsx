@@ -53,7 +53,7 @@ const ActionCenter = ({ metrics, availability }) => {
   const totalQueue = items.reduce((sum, item) => sum + (item.missing ? 0 : Number(item.value) || 0), 0)
 
   return (
-    <section className="rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+    <section className="surface-raised rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
       <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-2.5 dark:border-gray-700">
         <div>
           <h2 className="text-sm font-semibold">Action center</h2>
@@ -63,7 +63,7 @@ const ActionCenter = ({ metrics, availability }) => {
           {totalQueue} open
         </span>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-1 min-[376px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
         {items.map((item) => {
           const Icon = item.icon
           const body = (

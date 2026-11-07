@@ -30,7 +30,7 @@ const KpiCard = ({
   const sparkColor = trend?.direction === 'down' ? '#dc2626' : colors.spark
 
   const content = (
-    <div className="relative h-full overflow-hidden rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
+    <div className="surface-raised lift-card relative h-full overflow-hidden rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
       <span className={`absolute inset-y-0 left-0 w-0.5 ${colors.bar}`} />
       <div className="flex items-start justify-between gap-2 pl-1">
         <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500 leading-tight">{title}</p>

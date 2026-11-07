@@ -44,6 +44,7 @@ const ActivityHeatmap = ({ heatmap }) => {
 
   return (
     <Panel
+      className="surface-raised"
       title="User activity by day and time"
       action={<span className="text-[11px] text-gray-400">Last active in the selected range</span>}
     >

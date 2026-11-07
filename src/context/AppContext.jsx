@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useCallback, useContext, useState, useEffect } from 'react'
 import { mockData } from '../utils/mockData'
 import { onAuthChange, logoutAdmin } from '../firebase/auth'
 import { collection, query, where, onSnapshot, getDocs, limit, collectionGroup } from 'firebase/firestore'
@@ -20,6 +20,7 @@ export const AppProvider = ({ children }) => {
     return saved ? JSON.parse(saved) : false
   })
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [data, setData] = useState(mockData)
   const [notifications, setNotifications] = useState([])
   
@@ -431,6 +432,14 @@ export const AppProvider = ({ children }) => {
     setSidebarOpen(!sidebarOpen)
   }
 
+  const toggleMobileNav = useCallback(() => {
+    setMobileNavOpen((open) => !open)
+  }, [])
+
+  const closeMobileNav = useCallback(() => {
+    setMobileNavOpen(false)
+  }, [])
+
   const showToast = (message, type = 'success') => {
     const id = Date.now()
     setNotifications(prev => [...prev, { id, message, type }])
@@ -556,6 +565,9 @@ export const AppProvider = ({ children }) => {
     toggleDarkMode,
     sidebarOpen,
     toggleSidebar,
+    mobileNavOpen,
+    toggleMobileNav,
+    closeMobileNav,
     // Data & Notifications
     data,
     notifications,

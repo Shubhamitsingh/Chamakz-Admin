@@ -18,7 +18,7 @@ const Toast = () => {
   }
 
   return (
-    <div className="fixed top-4 right-4 z-50 space-y-2">
+    <div className="fixed right-3 top-3 z-50 max-w-[calc(100vw-1.5rem)] space-y-2 min-[1025px]:right-4 min-[1025px]:top-4">
       <AnimatePresence>
         {notifications.map((notification) => (
           <motion.div
@@ -26,7 +26,7 @@ const Toast = () => {
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
-            className={`border rounded-md px-3 py-2 text-xs flex items-center gap-2 min-w-[240px] ${styles[notification.type] || styles.success}`}
+            className={`flex max-w-full items-center gap-2 rounded-md border px-3 py-2 text-xs min-[1025px]:min-w-[240px] ${styles[notification.type] || styles.success}`}
           >
             {icons[notification.type] || icons.success}
             <span className="flex-1">{notification.message}</span>

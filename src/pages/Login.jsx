@@ -396,6 +396,13 @@ const Login = () => {
           animate={{ opacity: 1, x: 0 }}
           className="w-full max-w-md"
         >
+          <div className="mb-6 flex items-center gap-2 lg:hidden">
+            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg bg-pink-500">
+              <img src="/adminlogo.png" alt="" className="h-full w-full object-contain" />
+            </div>
+            <span className="text-sm font-semibold">Chamakz Admin</span>
+          </div>
+
           {/* Welcome Message */}
           <div className="mb-8">
             <h1 className="text-lg font-semibold tracking-tight text-gray-900 dark:text-white mb-2">
@@ -530,7 +537,7 @@ const Login = () => {
             </div>
 
             {/* Remember & Forgot Password */}
-            <div className="flex items-center justify-between text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"

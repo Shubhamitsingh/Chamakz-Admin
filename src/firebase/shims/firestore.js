@@ -89,6 +89,12 @@ const resolvePath = (ref) => {
 
 export const getFirestore = () => ({ mock: true })
 
+export const getStore = () => store
+
+export const touchStore = (...paths) => {
+  paths.forEach((path) => notify(path))
+}
+
 export const collection = (_db, ...segments) => ({
   type: 'collection',
   path: segments.join('/'),
